@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Евангельский навигатор</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Подключаем библиотеку мессенджера MAX -->
+    <script src="https://st.max.ru/js/max-web-app.js"></script>
+</head>
+<body>
+    <div id="app-container">
+        <header>
+            <h1>Евангельский навигатор</h1>
+            <p id="user-greeting">Загрузка...</p>
+        </header>
+
+        <main>
+            <div class="search-box">
+                <input type="text" id="search-input" placeholder="О чем вы хотите узнать?">
+                <button id="search-btn">Найти</button>
+            </div>
+            
+            <div id="results-container">
+                <!-- Здесь будут появляться ответы от GigaChat и стихи из Библии -->
+                <p class="placeholder-text">Напишите свой вопрос или тему в поле выше.</p>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
