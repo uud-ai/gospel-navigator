@@ -2,59 +2,115 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    
-    <!-- Новое лаконичное название -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+
     <title>Благовест</title>
-    
+
     <!-- Настройки для iPhone (имя под иконкой и полноэкранный режим) -->
     <meta name="apple-mobile-web-app-title" content="Благовест">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    
-    <!-- Благородная иконка (темно-синий фон и кремовый крест, генерируется кодом) -->
+    <meta name="theme-color" content="#2c3e50">
+
+    <!-- Иконка: тёмно-синий фон, кремовый крест -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2220%22 fill=%22%232c3e50%22/><text x=%2250%%22 y=%2250%%22 font-size=%2265%22 text-anchor=%22middle%22 dominant-baseline=%22central%22 fill=%22%23f4f1ea%22>✝</text></svg>">
     <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%232c3e50%22/><text x=%2250%%22 y=%2250%%22 font-size=%2265%22 text-anchor=%22middle%22 dominant-baseline=%22central%22 fill=%22%23f4f1ea%22>✝</text></svg>">
 
-    <!-- Подключаем шрифты и Markdown -->
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    <!-- Шрифты, Markdown, иконки Tabler -->
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.0.0/tabler-icons.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <!-- Telegram Mini App SDK (для будущего перехода в Telegram). Безопасно работает и в обычном браузере. -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
     <style>
         :root {
             --primary-color: #2c3e50;
             --accent-color: #c0392b;
-            --bg-color: #f4f1ea; /* Эффект старой бумаги */
+            --bg-color: #f4f1ea;
             --chat-bg: #ffffff;
+            --card-border: #d6d0c4;
+            --muted: #5a5a5a;
+        }
+
+        * { box-sizing: border-box; }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--bg-color);
+            color: #333;
+            -webkit-font-smoothing: antialiased;
         }
 
         body {
-            font-family: 'Roboto', sans-serif;
-            background-color: var(--bg-color);
-            margin: 0;
             display: flex;
             flex-direction: column;
-            height: 100vh;
+            min-height: 100vh;
+            min-height: 100dvh;
         }
 
-        /* Гибкая шапка (Flexbox) - защищает от наезжания текста на кнопку */
+        /* === ШАПКА === */
         header {
             background-color: var(--primary-color);
             color: white;
-            padding: 10px 15px;
+            padding: 12px 16px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            position: sticky;
+            top: 0;
+            z-index: 10;
         }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .back-btn {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.25);
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 18px;
+            padding: 0;
+            flex-shrink: 0;
+        }
+
+        .back-btn.visible {
+            display: inline-flex;
+        }
+
+        .back-btn:hover { background: rgba(255,255,255,0.2); }
 
         header h1 {
             margin: 0;
             font-family: 'Playfair Display', serif;
             font-size: 20px;
-            white-space: nowrap; /* Запрет переноса названия */
+            font-weight: 700;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
-        /* Кнопка очистки истории - теперь она часть flex-контейнера */
-        #clear-btn {
+        .header-actions {
+            display: flex;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .header-btn {
             background: rgba(255,255,255,0.1);
             border: 1px solid rgba(255,255,255,0.3);
             color: white;
@@ -62,28 +118,243 @@
             border-radius: 15px;
             font-size: 11px;
             cursor: pointer;
-            transition: all 0.2s;
-            flex-shrink: 0; /* Запрещаем кнопке сжиматься */
-            margin-left: 10px;
+            transition: background 0.2s;
+            white-space: nowrap;
         }
 
-        #clear-btn:hover { background: rgba(255,255,255,0.25); }
+        .header-btn:hover { background: rgba(255,255,255,0.25); }
+
+        /* === ЭКРАНЫ === */
+        .screen {
+            display: none;
+            flex: 1;
+            flex-direction: column;
+        }
+
+        .screen.active {
+            display: flex;
+        }
+
+        /* === ГЛАВНАЯ С ПЛИТКАМИ === */
+        #screen-home {
+            padding: 20px 16px 24px;
+        }
+
+        .intro {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .intro-greeting {
+            font-family: 'Playfair Display', serif;
+            font-size: 22px;
+            color: var(--primary-color);
+            margin: 0 0 6px;
+            font-style: italic;
+        }
+
+        .intro-subtitle {
+            font-size: 14px;
+            color: var(--muted);
+            margin: 0;
+            line-height: 1.5;
+        }
+
+        .tiles-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .tile {
+            background: white;
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 16px 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            min-height: 92px;
+            justify-content: center;
+        }
+
+        .tile:hover, .tile:active {
+            border-color: var(--accent-color);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+        }
+
+        .tile-icon {
+            font-size: 28px;
+            color: var(--accent-color);
+            line-height: 1;
+        }
+
+        .tile-title {
+            font-size: 13px;
+            color: var(--primary-color);
+            font-weight: 500;
+            line-height: 1.25;
+        }
+
+        .free-chat-card {
+            background: white;
+            border: 1px dashed var(--accent-color);
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .free-chat-card:hover {
+            background: #fdf6f5;
+        }
+
+        .free-chat-card .label {
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 4px;
+        }
+
+        .free-chat-card .action {
+            font-size: 15px;
+            color: var(--accent-color);
+            font-weight: 500;
+        }
+
+        .free-chat-card i {
+            margin-right: 6px;
+            vertical-align: -2px;
+        }
+
+        /* === СТРАНИЦА ТЕМЫ === */
+        #screen-topic {
+            padding: 20px 16px 24px;
+            overflow-y: auto;
+        }
+
+        .topic-header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .topic-icon {
+            font-size: 44px;
+            color: var(--accent-color);
+            margin-bottom: 8px;
+            line-height: 1;
+        }
+
+        .topic-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 24px;
+            color: var(--primary-color);
+            margin: 0 0 8px;
+        }
+
+        .topic-intro {
+            font-size: 15px;
+            color: var(--muted);
+            margin: 0;
+            font-style: italic;
+            line-height: 1.5;
+        }
+
+        .verses-section, .commentary-section {
+            margin-bottom: 24px;
+        }
+
+        .section-label {
+            font-family: 'Playfair Display', serif;
+            font-size: 13px;
+            color: var(--accent-color);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin: 0 0 12px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        .verse {
+            background: white;
+            border: 1px solid var(--card-border);
+            border-left: 3px solid var(--accent-color);
+            border-radius: 8px;
+            padding: 12px 14px;
+            margin-bottom: 8px;
+        }
+
+        .verse-ref {
+            font-size: 12px;
+            color: var(--accent-color);
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .verse-text {
+            font-size: 14px;
+            color: #333;
+            line-height: 1.6;
+            font-style: italic;
+        }
+
+        .commentary-text {
+            font-size: 15px;
+            line-height: 1.7;
+            color: #333;
+            margin: 0 0 12px;
+        }
+
+        .ask-btn {
+            display: block;
+            width: 100%;
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 30px;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 16px;
+        }
+
+        .ask-btn:hover { background: #a93226; }
+
+        .ask-btn i {
+            margin-right: 6px;
+            vertical-align: -2px;
+        }
+
+        /* === ЧАТ === */
+        #screen-chat {
+            flex: 1;
+            min-height: 0;
+        }
 
         #chat-container {
             flex: 1;
             overflow-y: auto;
-            padding: 20px;
+            padding: 20px 16px;
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 12px;
+            min-height: 0;
         }
 
         .message {
             max-width: 85%;
-            padding: 12px 18px;
+            padding: 12px 16px;
             border-radius: 15px;
             line-height: 1.6;
-            font-size: 16px;
+            font-size: 15px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.08);
             word-wrap: break-word;
         }
@@ -103,185 +374,402 @@
             border: 1px solid #ddd;
         }
 
+        .topic-badge {
+            align-self: center;
+            background: rgba(192, 57, 43, 0.08);
+            color: var(--accent-color);
+            font-size: 12px;
+            padding: 4px 12px;
+            border-radius: 12px;
+            border: 1px solid rgba(192, 57, 43, 0.2);
+        }
+
         .bible-link {
             color: var(--accent-color);
             text-decoration: none;
-            font-weight: bold;
+            font-weight: 500;
             border-bottom: 1px dashed var(--accent-color);
-            transition: all 0.2s;
         }
 
-        .bible-link:hover {
-            background-color: rgba(192, 57, 43, 0.1);
-            border-bottom-style: solid;
-        }
+        .bible-link:hover { background-color: rgba(192, 57, 43, 0.08); }
 
         .ai-message p { margin: 8px 0; }
+        .ai-message p:first-child { margin-top: 0; }
+        .ai-message p:last-child { margin-bottom: 0; }
         .ai-message strong { color: var(--accent-color); }
-        .ai-message ul, .ai-message ol { padding-left: 20px; }
+        .ai-message ul, .ai-message ol { padding-left: 20px; margin: 8px 0; }
 
         .input-area {
             background: white;
-            padding: 20px;
+            padding: 12px 16px;
             display: flex;
-            gap: 10px;
+            gap: 8px;
             border-top: 1px solid #ddd;
             align-items: center;
+            padding-bottom: calc(12px + env(safe-area-inset-bottom));
         }
 
-        input {
+        #userInput {
             flex: 1;
-            padding: 14px 20px;
+            padding: 12px 16px;
             border: 1px solid #ccc;
-            border-radius: 30px;
+            border-radius: 25px;
             outline: none;
-            font-size: 16px;
-            transition: border 0.3s;
+            font-size: 15px;
+            font-family: inherit;
         }
 
-        input:focus { border-color: var(--primary-color); }
+        #userInput:focus { border-color: var(--primary-color); }
 
         button#sendBtn {
             background-color: var(--accent-color);
             color: white;
             border: none;
-            padding: 12px 25px;
-            border-radius: 30px;
+            padding: 10px 20px;
+            border-radius: 25px;
             cursor: pointer;
-            font-weight: bold;
-            transition: transform 0.2s, background 0.2s;
+            font-weight: 500;
+            font-size: 14px;
+            font-family: inherit;
+            white-space: nowrap;
         }
 
-        button#sendBtn:hover:not(:disabled) {
-            background-color: #a93226;
-            transform: scale(1.03);
-        }
-
+        button#sendBtn:hover:not(:disabled) { background-color: #a93226; }
         button:disabled { background-color: #ccc; cursor: not-allowed; }
 
         #loader {
             display: none;
             text-align: center;
-            padding: 10px;
+            padding: 8px 16px;
             font-style: italic;
             color: #666;
-            font-size: 14px;
+            font-size: 13px;
         }
 
         .spinner {
-            width: 14px;
-            height: 14px;
+            width: 12px;
+            height: 12px;
             border: 2px solid #f3f3f3;
             border-top: 2px solid var(--accent-color);
             border-radius: 50%;
             animation: spin 1s linear infinite;
             display: inline-block;
-            margin-right: 8px;
+            margin-right: 6px;
             vertical-align: middle;
         }
 
         @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        /* На больших экранах ограничиваем ширину для удобства чтения */
+        @media (min-width: 600px) {
+            body { max-width: 480px; margin: 0 auto; box-shadow: 0 0 30px rgba(0,0,0,0.05); }
+        }
     </style>
 </head>
 <body>
 
 <header>
-    <h1>Благовест</h1>
-    <button id="clear-btn" onclick="clearHistory()">Очистить всё</button>
+    <div class="header-left">
+        <button class="back-btn" id="backBtn" aria-label="Назад">‹</button>
+        <h1 id="headerTitle">Благовест</h1>
+    </div>
+    <div class="header-actions">
+        <button class="header-btn" id="clearBtn">Очистить</button>
+    </div>
 </header>
 
-<div id="chat-container"></div>
-
-<div id="loader">
-    <div class="spinner"></div> Обращаюсь к Писанию...
+<!-- ЭКРАН 1: Главная с плитками -->
+<div class="screen active" id="screen-home">
+    <div class="intro">
+        <h2 class="intro-greeting">Мир вам</h2>
+        <p class="intro-subtitle">Выберите тему, чтобы найти ответы в Евангелии</p>
+    </div>
+    <div class="tiles-grid" id="tilesGrid"></div>
+    <div class="free-chat-card" id="freeChatCard">
+        <div class="label">или</div>
+        <div class="action"><i class="ti ti-messages"></i>Спросить свободно</div>
+    </div>
 </div>
 
-<div class="input-area">
-    <input type="text" id="userInput" placeholder="Спросите о Евангелии..." onkeypress="handleKeyPress(event)">
-    <button id="sendBtn" onclick="sendMessage()">Спросить</button>
+<!-- ЭКРАН 2: Страница темы -->
+<div class="screen" id="screen-topic">
+    <div class="topic-header">
+        <div class="topic-icon"><i id="topicIcon"></i></div>
+        <h2 class="topic-title" id="topicTitle"></h2>
+        <p class="topic-intro" id="topicIntro"></p>
+    </div>
+
+    <div class="verses-section">
+        <h3 class="section-label">Слово Писания</h3>
+        <div id="versesList"></div>
+    </div>
+
+    <div class="commentary-section">
+        <h3 class="section-label">Размышление</h3>
+        <div id="commentaryList"></div>
+    </div>
+
+    <button class="ask-btn" id="askAboutTopicBtn">
+        <i class="ti ti-message-circle-question"></i>Задать вопрос по этой теме
+    </button>
 </div>
+
+<!-- ЭКРАН 3: Чат -->
+<div class="screen" id="screen-chat">
+    <div id="chat-container"></div>
+    <div id="loader">
+        <div class="spinner"></div> Обращаюсь к Писанию...
+    </div>
+    <div class="input-area">
+        <input type="text" id="userInput" placeholder="Спросите о Евангелии...">
+        <button id="sendBtn">Спросить</button>
+    </div>
+</div>
+
+<!-- Подключаем контент тем -->
+<script src="topics.js"></script>
 
 <script>
-    const functionUrl = 'https://functions.yandexcloud.net/d4e7o4ivid26hthcabc9';
-    const chatContainer = document.getElementById('chat-container');
-    const userInput = document.getElementById('userInput');
-    const sendBtn = document.getElementById('sendBtn');
-    const loader = document.getElementById('loader');
+    // ============================================================
+    // НАСТРОЙКИ
+    // ============================================================
+    const FUNCTION_URL = 'https://functions.yandexcloud.net/d4e7o4ivid26hthcabc9';
 
+    // ============================================================
+    // TELEGRAM MINI APP (если запущено внутри Telegram)
+    // ============================================================
+    const tg = window.Telegram?.WebApp;
+    const isInTelegram = tg && tg.initData && tg.initData.length > 0;
+    if (tg) {
+        try {
+            tg.ready();
+            tg.expand();
+            // Подстраиваем цвет шапки под наш дизайн
+            tg.setHeaderColor('#2c3e50');
+            tg.setBackgroundColor('#f4f1ea');
+        } catch (e) { /* в обычном браузере просто игнорируем */ }
+    }
+
+    // ============================================================
+    // СОСТОЯНИЕ
+    // ============================================================
+    let currentScreen = 'home';
+    let currentTopic = null;
+    let chatHistory = JSON.parse(localStorage.getItem('blagovest_chat_history') || '[]');
+
+    // ============================================================
+    // ССЫЛКИ НА КНИГИ ПИСАНИЯ (для интерактивных ссылок в ответах AI)
+    // ============================================================
     const bibleBooksMap = {
-        'Матфея': 'Mt', 'Мф': 'Mt', 'Марка': 'Mk', 'Мк': 'Mk',
-        'Луки': 'Lk', 'Лк': 'Lk', 'Иоанна': 'Jn', 'Ин': 'Jn', 'Иоанн': 'Jn'
+        'Матфея': 'Mt', 'Мф': 'Mt',
+        'Марка': 'Mk', 'Мк': 'Mk',
+        'Луки': 'Lk', 'Лк': 'Lk',
+        'Иоанна': 'Jn', 'Ин': 'Jn', 'Иоанн': 'Jn',
+        'Римлянам': 'Rom', 'Рим': 'Rom',
+        '1 Коринфянам': '1Cor', '1 Кор': '1Cor',
+        '2 Коринфянам': '2Cor', '2 Кор': '2Cor',
+        'Галатам': 'Gal', 'Гал': 'Gal',
+        'Ефесянам': 'Eph', 'Еф': 'Eph',
+        'Филиппийцам': 'Phil', 'Флп': 'Phil',
+        'Колоссянам': 'Col', 'Кол': 'Col',
+        '1 Тимофею': '1Tim', '1 Тим': '1Tim',
+        '2 Тимофею': '2Tim', '2 Тим': '2Tim',
+        '1 Петра': '1Pet', '1 Пет': '1Pet',
+        '2 Петра': '2Pet', '2 Пет': '2Pet',
+        'Иакова': 'Jas', 'Иак': 'Jas',
+        'Деяний': 'Acts', 'Деян': 'Acts'
     };
 
-    function linkifyBible(text) {
-        const regex = /(Матфея|Марка|Луки|Иоанна|Мф|Мк|Лк|Ин|Иоанн)\.?\s*(\d+):(\d+(?:-\d+)?)/gi;
-        return text.replace(regex, (match, book, chapter, verse) => {
-            const bookCode = bibleBooksMap[book] || 'Jn';
+    function linkifyBible(html) {
+        const regex = /(1\s*Кор|2\s*Кор|1\s*Тим|2\s*Тим|1\s*Пет|2\s*Пет|Матфея|Марка|Луки|Иоанна|Римлянам|Галатам|Ефесянам|Филиппийцам|Колоссянам|Иакова|Деяний|Мф|Мк|Лк|Ин|Иоанн|Рим|Гал|Еф|Флп|Кол|Иак|Деян)\.?\s*(\d+):(\d+(?:-\d+)?)/gi;
+        return html.replace(regex, (match, book, chapter, verse) => {
+            const normalized = book.replace(/\s+/g, ' ').trim();
+            const bookCode = bibleBooksMap[normalized] || bibleBooksMap[normalized.replace(/\s/g, '')] || 'Jn';
             const url = `https://azbyka.ru/biblia/?${bookCode}.${chapter}:${verse}`;
-            return `<a href="${url}" target="_blank" class="bible-link">${match}</a>`;
+            return `<a href="${url}" target="_blank" rel="noopener" class="bible-link">${match}</a>`;
         });
     }
 
-    let chatHistory = JSON.parse(localStorage.getItem('gospel_chat_history')) || [];
+    // ============================================================
+    // НАВИГАЦИЯ МЕЖДУ ЭКРАНАМИ
+    // ============================================================
+    function showScreen(name) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById('screen-' + name).classList.add('active');
+        currentScreen = name;
 
-    window.onload = () => {
-        if (chatHistory.length === 0) {
-            appendMessage('ai', 'Мир вам! Я помогу найти ответы в Четвероевангелии. О чем вы хотите спросить?', false);
-        } else {
-            chatHistory.forEach(msg => {
-                appendMessage(msg.role === 'user' ? 'user' : 'ai', msg.content, false);
-            });
+        const backBtn = document.getElementById('backBtn');
+        const headerTitle = document.getElementById('headerTitle');
+
+        if (name === 'home') {
+            backBtn.classList.remove('visible');
+            headerTitle.textContent = 'Благовест';
+            currentTopic = null;
+        } else if (name === 'topic') {
+            backBtn.classList.add('visible');
+            headerTitle.textContent = currentTopic ? currentTopic.title : 'Тема';
+        } else if (name === 'chat') {
+            backBtn.classList.add('visible');
+            headerTitle.textContent = 'Беседа';
+            setTimeout(() => {
+                const cc = document.getElementById('chat-container');
+                cc.scrollTop = cc.scrollHeight;
+            }, 50);
         }
-    };
 
+        // Для Telegram Mini App: показываем системную кнопку «Назад»
+        if (isInTelegram && tg.BackButton) {
+            try {
+                if (name === 'home') tg.BackButton.hide();
+                else tg.BackButton.show();
+            } catch (e) {}
+        }
+
+        window.scrollTo(0, 0);
+    }
+
+    function goBack() {
+        if (currentScreen === 'chat' && currentTopic) {
+            showScreen('topic');
+        } else {
+            showScreen('home');
+        }
+    }
+
+    // ============================================================
+    // РЕНДЕР ГЛАВНОЙ
+    // ============================================================
+    function renderHome() {
+        const grid = document.getElementById('tilesGrid');
+        grid.innerHTML = '';
+        TOPICS.forEach(topic => {
+            const tile = document.createElement('div');
+            tile.className = 'tile';
+            tile.innerHTML = `
+                <div class="tile-icon"><i class="ti ${topic.icon}"></i></div>
+                <div class="tile-title">${topic.title}</div>
+            `;
+            tile.addEventListener('click', () => openTopic(topic.id));
+            grid.appendChild(tile);
+        });
+    }
+
+    // ============================================================
+    // РЕНДЕР СТРАНИЦЫ ТЕМЫ
+    // ============================================================
+    function openTopic(topicId) {
+        const topic = TOPICS.find(t => t.id === topicId);
+        if (!topic) return;
+        currentTopic = topic;
+
+        document.getElementById('topicIcon').className = 'ti ' + topic.icon;
+        document.getElementById('topicTitle').textContent = topic.title;
+        document.getElementById('topicIntro').textContent = topic.intro;
+
+        const versesList = document.getElementById('versesList');
+        versesList.innerHTML = '';
+        topic.verses.forEach(v => {
+            const div = document.createElement('div');
+            div.className = 'verse';
+            div.innerHTML = `
+                <div class="verse-ref">${v.ref}</div>
+                <div class="verse-text">${v.text}</div>
+            `;
+            versesList.appendChild(div);
+        });
+
+        const commentaryList = document.getElementById('commentaryList');
+        commentaryList.innerHTML = '';
+        topic.commentary.forEach(paragraph => {
+            const p = document.createElement('p');
+            p.className = 'commentary-text';
+            p.textContent = paragraph;
+            commentaryList.appendChild(p);
+        });
+
+        showScreen('topic');
+    }
+
+    // ============================================================
+    // ЧАТ
+    // ============================================================
     function saveHistory() {
-        localStorage.setItem('gospel_chat_history', JSON.stringify(chatHistory));
+        localStorage.setItem('blagovest_chat_history', JSON.stringify(chatHistory));
     }
 
     function clearHistory() {
-        if (confirm('Удалить всю историю переписки?')) {
-            localStorage.removeItem('gospel_chat_history');
-            chatHistory = [];
-            chatContainer.innerHTML = '';
-            appendMessage('ai', 'История очищена. О чем вы хотите спросить?', false);
-        }
+        const yes = confirm('Очистить историю переписки?');
+        if (!yes) return;
+        chatHistory = [];
+        localStorage.removeItem('blagovest_chat_history');
+        const cc = document.getElementById('chat-container');
+        cc.innerHTML = '';
+        appendMessage('ai', 'История очищена. О чём вы хотите спросить?', false);
     }
 
-    function handleKeyPress(e) { if (e.key === 'Enter') sendMessage(); }
+    function openChat(topicContext) {
+        const cc = document.getElementById('chat-container');
+        cc.innerHTML = '';
+
+        // Если открываем чат по теме — добавляем «бейдж темы» и приветствие в контексте темы
+        if (topicContext) {
+            const badge = document.createElement('div');
+            badge.className = 'topic-badge';
+            badge.innerHTML = `<i class="ti ${topicContext.icon}"></i> ${topicContext.title}`;
+            cc.appendChild(badge);
+
+            appendMessage('ai',
+                `Готов обсудить с вами тему «${topicContext.title}». О чём именно вы хотели бы поговорить?`,
+                false
+            );
+        } else {
+            // Свободный чат — показываем накопленную историю
+            if (chatHistory.length === 0) {
+                appendMessage('ai', 'Мир вам! Я помогу найти ответы в Евангелии. О чём вы хотите спросить?', false);
+            } else {
+                chatHistory.forEach(msg => {
+                    appendMessage(msg.role === 'user' ? 'user' : 'ai', msg.content, false);
+                });
+            }
+        }
+
+        showScreen('chat');
+        setTimeout(() => document.getElementById('userInput').focus(), 100);
+    }
 
     async function sendMessage() {
-        const text = userInput.value.trim();
-        
-        if (!text || text.length < 3) {
-            alert('Пожалуйста, введите более конкретный вопрос о Евангелии.');
-            return;
-        }
+        const input = document.getElementById('userInput');
+        const text = input.value.trim();
+        if (!text || text.length < 2) return;
 
         appendMessage('user', text);
         chatHistory.push({ role: "user", content: text });
         saveHistory();
-        
-        userInput.value = '';
+        input.value = '';
         setLoading(true);
 
         try {
-            const response = await fetch(functionUrl, {
+            const payload = {
+                messages: chatHistory,
+                topicContext: currentTopic ? currentTopic.aiContext : null
+            };
+
+            const response = await fetch(FUNCTION_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ messages: chatHistory })
+                body: JSON.stringify(payload)
             });
 
             if (!response.ok) throw new Error('Ошибка связи с сервером');
-            
+
             const data = await response.json();
-            const aiAnswer = data.message;
-            
+            const aiAnswer = data.message || 'Извините, не получил ответа.';
+
             appendMessage('ai', aiAnswer);
             chatHistory.push({ role: "assistant", content: aiAnswer });
-            
+
             if (chatHistory.length > 12) chatHistory = chatHistory.slice(-12);
             saveHistory();
-
         } catch (error) {
             appendMessage('ai', 'К сожалению, произошла ошибка: ' + error.message);
         } finally {
@@ -290,26 +778,52 @@
     }
 
     function appendMessage(role, text, shouldScroll = true) {
+        const cc = document.getElementById('chat-container');
         const msgDiv = document.createElement('div');
         msgDiv.className = `message ${role === 'user' ? 'user-message' : 'ai-message'}`;
-        
+
         if (role === 'ai' || role === 'assistant') {
-            let html = marked.parse(text);
+            const html = marked.parse(text);
             msgDiv.innerHTML = linkifyBible(html);
         } else {
             msgDiv.textContent = text;
         }
-        
-        chatContainer.appendChild(msgDiv);
-        if (shouldScroll) chatContainer.scrollTop = chatContainer.scrollHeight;
+
+        cc.appendChild(msgDiv);
+        if (shouldScroll) cc.scrollTop = cc.scrollHeight;
     }
 
     function setLoading(isLoading) {
-        loader.style.display = isLoading ? 'block' : 'none';
-        sendBtn.disabled = isLoading;
-        userInput.disabled = isLoading;
-        if (!isLoading) userInput.focus();
+        document.getElementById('loader').style.display = isLoading ? 'block' : 'none';
+        document.getElementById('sendBtn').disabled = isLoading;
+        document.getElementById('userInput').disabled = isLoading;
+        if (!isLoading) document.getElementById('userInput').focus();
     }
+
+    // ============================================================
+    // СЛУШАТЕЛИ СОБЫТИЙ
+    // ============================================================
+    document.getElementById('backBtn').addEventListener('click', goBack);
+    document.getElementById('clearBtn').addEventListener('click', clearHistory);
+    document.getElementById('freeChatCard').addEventListener('click', () => openChat(null));
+    document.getElementById('askAboutTopicBtn').addEventListener('click', () => openChat(currentTopic));
+    document.getElementById('sendBtn').addEventListener('click', sendMessage);
+    document.getElementById('userInput').addEventListener('keypress', e => {
+        if (e.key === 'Enter') sendMessage();
+    });
+
+    // Системная кнопка «Назад» в Telegram Mini App
+    if (isInTelegram && tg.BackButton) {
+        try {
+            tg.BackButton.onClick(goBack);
+        } catch (e) {}
+    }
+
+    // ============================================================
+    // ЗАПУСК
+    // ============================================================
+    renderHome();
+    showScreen('home');
 </script>
 
 </body>
