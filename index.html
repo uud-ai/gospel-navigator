@@ -3,8 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Навигатор по Евангелию</title>
-    <!-- Подключаем благородные шрифты и библиотеку Markdown -->
+    
+    <!-- Новое лаконичное название -->
+    <title>Благовест</title>
+    
+    <!-- Настройки для iPhone (имя под иконкой и полноэкранный режим) -->
+    <meta name="apple-mobile-web-app-title" content="Благовест">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    
+    <!-- Благородная иконка (темно-синий фон и кремовый крест, генерируется кодом) -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2220%22 fill=%22%232c3e50%22/><text x=%2250%%22 y=%2250%%22 font-size=%2265%22 text-anchor=%22middle%22 dominant-baseline=%22central%22 fill=%22%23f4f1ea%22>✝</text></svg>">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%232c3e50%22/><text x=%2250%%22 y=%2250%%22 font-size=%2265%22 text-anchor=%22middle%22 dominant-baseline=%22central%22 fill=%22%23f4f1ea%22>✝</text></svg>">
+
+    <!-- Подключаем шрифты и Markdown -->
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
@@ -24,36 +35,36 @@
             height: 100vh;
         }
 
+        /* Гибкая шапка (Flexbox) - защищает от наезжания текста на кнопку */
         header {
             background-color: var(--primary-color);
             color: white;
-            padding: 15px 20px;
-            text-align: center;
+            padding: 10px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-            position: relative;
         }
 
         header h1 {
             margin: 0;
             font-family: 'Playfair Display', serif;
-            font-size: 22px;
-            letter-spacing: 0.5px;
+            font-size: 20px;
+            white-space: nowrap; /* Запрет переноса названия */
         }
 
-        /* Кнопка очистки истории */
+        /* Кнопка очистки истории - теперь она часть flex-контейнера */
         #clear-btn {
-            position: absolute;
-            right: 20px;
-            top: 50%;
-            transform: translateY(-50%);
             background: rgba(255,255,255,0.1);
             border: 1px solid rgba(255,255,255,0.3);
             color: white;
             padding: 6px 12px;
-            border-radius: 20px;
+            border-radius: 15px;
             font-size: 11px;
             cursor: pointer;
             transition: all 0.2s;
+            flex-shrink: 0; /* Запрещаем кнопке сжиматься */
+            margin-left: 10px;
         }
 
         #clear-btn:hover { background: rgba(255,255,255,0.25); }
@@ -92,7 +103,6 @@
             border: 1px solid #ddd;
         }
 
-        /* Оформление ссылок на Писание */
         .bible-link {
             color: var(--accent-color);
             text-decoration: none;
@@ -106,7 +116,6 @@
             border-bottom-style: solid;
         }
 
-        /* Стилизация текста ответа */
         .ai-message p { margin: 8px 0; }
         .ai-message strong { color: var(--accent-color); }
         .ai-message ul, .ai-message ol { padding-left: 20px; }
@@ -177,7 +186,7 @@
 <body>
 
 <header>
-    <h1>Навигатор по Евангелию</h1>
+    <h1>Благовест</h1>
     <button id="clear-btn" onclick="clearHistory()">Очистить всё</button>
 </header>
 
@@ -193,20 +202,17 @@
 </div>
 
 <script>
-    // 1. КОНФИГУРАЦИЯ
     const functionUrl = 'https://functions.yandexcloud.net/d4e7o4ivid26hthcabc9';
     const chatContainer = document.getElementById('chat-container');
     const userInput = document.getElementById('userInput');
     const sendBtn = document.getElementById('sendBtn');
     const loader = document.getElementById('loader');
 
-    // Словарь для кликабельных ссылок (Azbyka.ru)
     const bibleBooksMap = {
         'Матфея': 'Mt', 'Мф': 'Mt', 'Марка': 'Mk', 'Мк': 'Mk',
         'Луки': 'Lk', 'Лк': 'Lk', 'Иоанна': 'Jn', 'Ин': 'Jn', 'Иоанн': 'Jn'
     };
 
-    // 2. ФУНКЦИЯ УМНЫХ ССЫЛОК
     function linkifyBible(text) {
         const regex = /(Матфея|Марка|Луки|Иоанна|Мф|Мк|Лк|Ин|Иоанн)\.?\s*(\d+):(\d+(?:-\d+)?)/gi;
         return text.replace(regex, (match, book, chapter, verse) => {
@@ -216,7 +222,6 @@
         });
     }
 
-    // 3. РАБОТА С ПАМЯТЬЮ (LOCAL STORAGE)
     let chatHistory = JSON.parse(localStorage.getItem('gospel_chat_history')) || [];
 
     window.onload = () => {
@@ -242,13 +247,11 @@
         }
     }
 
-    // 4. ЛОГИКА ОТПРАВКИ
     function handleKeyPress(e) { if (e.key === 'Enter') sendMessage(); }
 
     async function sendMessage() {
         const text = userInput.value.trim();
         
-        // ПРОВЕРКА РОБАСТНОСТИ: Не отправляем пустоту или слишком короткий текст
         if (!text || text.length < 3) {
             alert('Пожалуйста, введите более конкретный вопрос о Евангелии.');
             return;
@@ -276,7 +279,6 @@
             appendMessage('ai', aiAnswer);
             chatHistory.push({ role: "assistant", content: aiAnswer });
             
-            // Ограничиваем историю для ИИ (12 сообщений), чтобы не перегружать контекст
             if (chatHistory.length > 12) chatHistory = chatHistory.slice(-12);
             saveHistory();
 
@@ -292,7 +294,6 @@
         msgDiv.className = `message ${role === 'user' ? 'user-message' : 'ai-message'}`;
         
         if (role === 'ai' || role === 'assistant') {
-            // Сначала Markdown, затем ссылки
             let html = marked.parse(text);
             msgDiv.innerHTML = linkifyBible(html);
         } else {
