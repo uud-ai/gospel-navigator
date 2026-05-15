@@ -660,6 +660,14 @@
     function openTopic(topicId) {
         const topic = TOPICS.find(t => t.id === topicId);
         if (!topic) return;
+
+        // При переходе на НОВУЮ плитку — очищаем историю переписки.
+        // Если пользователь возвращается на ту же тему (например, после кнопки «Назад»),
+        // историю сохраняем — это продолжение той же беседы.
+        if (!currentTopic || currentTopic.id !== topic.id) {
+            resetHistory();
+        }
+
         currentTopic = topic;
 
         document.getElementById('topicIcon').className = 'ti ' + topic.icon;
@@ -697,6 +705,14 @@
         localStorage.setItem('blagovest_chat_history', JSON.stringify(chatHistory));
     }
 
+    // Тихая очистка истории — без подтверждения и без вывода сообщений.
+    // Используется при переключении контекста (новая плитка / возврат в свободный чат и т.п.),
+    // чтобы старая переписка не «протекала» в новый разговор и не уходила в API.
+    function resetHistory() {
+        chatHistory = [];
+        localStorage.removeItem('blagovest_chat_history');
+    }
+
     function clearHistory() {
         const yes = confirm('Очистить историю переписки?');
         if (!yes) return;
@@ -708,6 +724,16 @@
     }
 
     function openChat(topicContext) {
+        // Если переключаемся между свободным чатом и тематическим (или наоборот) —
+        // тоже считаем это сменой контекста и чистим историю.
+        // chatHistory.__context хранит маркер последнего контекста: null = свободный чат, id темы = тема.
+        const newContextKey = topicContext ? topicContext.id : null;
+        if (chatHistory.__context !== undefined && chatHistory.__context !== newContextKey) {
+            resetHistory();
+        }
+        // Помечаем текущий контекст (свойство на массиве — в localStorage не попадёт, JSON.stringify его опускает)
+        chatHistory.__context = newContextKey;
+
         const cc = document.getElementById('chat-container');
         cc.innerHTML = '';
 
