@@ -268,6 +268,66 @@
             vertical-align: -2px;
         }
 
+        /* === СТИХ ДНЯ === */
+        /* Карточка над сеткой тем. Стилистически родственна .verse из экрана темы:
+           та же левая акцентная полоса, тот же фон и border. Но крупнее, с лейблом
+           и кнопкой действия снизу. */
+        .verse-of-day {
+            background: var(--surface);
+            border: 1px solid var(--card-border);
+            border-left: 3px solid var(--accent-color);
+            border-radius: 12px;
+            padding: 14px 16px 12px;
+            margin-bottom: 16px;
+        }
+
+        .verse-of-day-label {
+            font-family: 'Playfair Display', serif;
+            font-size: 11px;
+            color: var(--accent-color);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 8px;
+        }
+
+        .verse-of-day-ref {
+            font-size: 12px;
+            color: var(--accent-color);
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+
+        .verse-of-day-text {
+            font-size: 15px;
+            color: var(--text);
+            line-height: 1.6;
+            font-style: italic;
+            margin: 0 0 12px;
+        }
+
+        /* Кнопка «Что это значит?» — компактная, выровнена по правому краю,
+           обведённая, чтобы не конкурировать визуально с акцентным «Спросить свободно» ниже. */
+        .verse-of-day-action {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: transparent;
+            border: 1px solid var(--accent-color);
+            color: var(--accent-color);
+            padding: 7px 14px;
+            border-radius: 18px;
+            font-size: 13px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s;
+        }
+
+        .verse-of-day-action:hover,
+        .verse-of-day-action:active {
+            background: var(--accent-color);
+            color: white;
+        }
+
         /* === СТРАНИЦА ТЕМЫ === */
         #screen-topic {
             padding: 20px 16px 24px;
@@ -526,6 +586,9 @@
         <h2 class="intro-greeting">Мир вам</h2>
         <p class="intro-subtitle">Выберите тему, чтобы найти ответы в Евангелии</p>
     </div>
+    <!-- Стих дня. Заполняется renderVerseOfDay(); если verses_of_day.js
+         не загрузился — блок остаётся пустым и не виден. -->
+    <div id="verseOfDay"></div>
     <div class="tiles-grid" id="tilesGrid"></div>
     <div class="free-chat-card" id="freeChatCard">
         <div class="label">или</div>
@@ -568,8 +631,9 @@
     </div>
 </div>
 
-<!-- Подключаем контент тем -->
+<!-- Подключаем контент тем и стих дня -->
 <script src="topics.js"></script>
+<script src="verses_of_day.js"></script>
 
 <script>
     // ============================================================
@@ -658,6 +722,11 @@
     // ============================================================
     let currentScreen = 'home';
     let currentTopic = null;
+    // Кэшируем выбранный стих дня в момент загрузки страницы.
+    // Если пользователь держит приложение открытым через полночь — стих
+    // не «прыгнет» сам собой; обновится при следующем открытии. Это намеренно:
+    // менять контент под пользователем посреди сессии — плохой UX.
+    let currentVerseOfDay = null;
     let chatHistory = JSON.parse(localStorage.getItem('blagovest_chat_history') || '[]');
 
     // ============================================================
@@ -757,6 +826,120 @@
             showScreen('topic');
         } else {
             showScreen('home');
+        }
+    }
+
+    // ============================================================
+    // СТИХ ДНЯ
+    // ============================================================
+    function renderVerseOfDay() {
+        const container = document.getElementById('verseOfDay');
+        if (!container) return;
+
+        // Если verses_of_day.js не подгрузился (например, при первом
+        // развёртывании на GitHub Pages, пока файла нет) — просто молча
+        // не рисуем блок, чтобы пользователь не видел поломанной разметки.
+        if (typeof getVerseOfDay !== 'function') return;
+
+        const v = getVerseOfDay();
+        currentVerseOfDay = v;
+
+        container.innerHTML = `
+            <div class="verse-of-day">
+                <div class="verse-of-day-label">Стих дня</div>
+                <div class="verse-of-day-ref">${v.ref}</div>
+                <p class="verse-of-day-text">${v.text}</p>
+                <button class="verse-of-day-action" id="verseOfDayBtn">
+                    <i class="ti ti-message-circle-question"></i>Что это значит?
+                </button>
+            </div>
+        `;
+
+        document.getElementById('verseOfDayBtn').addEventListener('click', () => {
+            haptic.medium();
+            openVerseOfDayChat();
+        });
+    }
+
+    // Открывает чат с предзаданным первым сообщением от лица пользователя.
+    // С точки зрения сервера это обычный чат-запрос, отличается только полем
+    // source='verse_of_day' и тегом стиха в payload — это нужно для аналитики.
+    function openVerseOfDayChat() {
+        if (!currentVerseOfDay) return;
+        const v = currentVerseOfDay;
+
+        // Это смена контекста относительно прежней переписки — чистим историю.
+        // Контекстный ключ — verse:<ref>, чтобы возврат к тому же стиху сохранял диалог,
+        // а возврат к другому стиху / теме / свободному чату — нет.
+        const newContextKey = 'verse:' + v.ref;
+        if (chatHistory.__context !== undefined && chatHistory.__context !== newContextKey) {
+            resetHistory();
+        }
+        chatHistory.__context = newContextKey;
+
+        const cc = document.getElementById('chat-container');
+        cc.innerHTML = '';
+
+        // Бейдж со ссылкой на стих — тот же стиль, что у тематических бейджей.
+        const badge = document.createElement('div');
+        badge.className = 'topic-badge';
+        badge.innerHTML = `<i class="ti ti-book-2"></i> Стих дня · ${v.ref}`;
+        cc.appendChild(badge);
+
+        // Если это первый заход на этот стих — формируем начальное
+        // сообщение пользователя и сразу отправляем. AI ответит, пользователь
+        // увидит результат как обычный чат.
+        const firstQuestion = `Объясни, пожалуйста, стих ${v.ref}: «${v.text}» — в каком контексте он был сказан и как его понимать?`;
+
+        showScreen('chat');
+
+        // Отправляем как обычное сообщение, помечая источник.
+        sendVerseOfDayQuestion(firstQuestion);
+    }
+
+    // Отдельная функция отправки: то же, что sendMessage, но текст приходит
+    // программно, а в payload добавлены source/verseTag для серверной аналитики.
+    async function sendVerseOfDayQuestion(text) {
+        haptic.light();
+        appendMessage('user', text);
+        chatHistory.push({ role: "user", content: text });
+        saveHistory();
+        setLoading(true);
+
+        try {
+            const payload = {
+                messages: chatHistory,
+                topicContext: null,
+                source: 'verse_of_day',
+                verseTag: currentVerseOfDay ? currentVerseOfDay.tag : null,
+                verseRef: currentVerseOfDay ? currentVerseOfDay.ref : null
+            };
+
+            const response = await fetch(FUNCTION_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-App-Token': APP_TOKEN },
+                body: JSON.stringify(payload)
+            });
+
+            if (response.status === 429 || response.status === 403 || response.status === 400) {
+                let serverMsg = '';
+                try { const errData = await response.json(); serverMsg = errData.message || ''; } catch (e) {}
+                throw new Error(serverMsg || 'Запрос отклонён сервером.');
+            }
+            if (!response.ok) throw new Error('Ошибка связи с сервером');
+
+            const data = await response.json();
+            const aiAnswer = data.message || 'Извините, не получил ответа.';
+            appendMessage('ai', aiAnswer);
+            chatHistory.push({ role: "assistant", content: aiAnswer });
+            if (chatHistory.length > 12) chatHistory = chatHistory.slice(-12);
+            saveHistory();
+            haptic.success();
+        } catch (error) {
+            appendMessage('ai', 'К сожалению, произошла ошибка: ' + error.message);
+            haptic.error();
+        } finally {
+            setLoading(false);
         }
     }
 
@@ -903,7 +1086,10 @@
         try {
             const payload = {
                 messages: chatHistory,
-                topicContext: currentTopic ? currentTopic.aiContext : null
+                topicContext: currentTopic ? currentTopic.aiContext : null,
+                // Маркер источника для серверной аналитики. См. также sendVerseOfDayQuestion.
+                source: currentTopic ? 'topic' : 'free_chat',
+                topicId: currentTopic ? currentTopic.id : null
             };
 
             const response = await fetch(FUNCTION_URL, {
@@ -1009,6 +1195,7 @@
     // ============================================================
     // ЗАПУСК
     // ============================================================
+    renderVerseOfDay();
     renderHome();
     showScreen('home');
 </script>
