@@ -19,6 +19,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.0.0/tabler-icons.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- DOMPurify — санитизация HTML после marked. Защищает от XSS, если LLM
+         (или будущий источник вроде commentaries) вернёт сырой HTML. Внутри
+         Telegram WebView это критично: там доступен tg.initData, по сути
+         токен аутентификации пользователя. -->
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 
     <!-- Telegram Mini App SDK (для будущего перехода в Telegram). Безопасно работает и в обычном браузере. -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -729,6 +734,23 @@
     let currentVerseOfDay = null;
     let chatHistory = JSON.parse(localStorage.getItem('blagovest_chat_history') || '[]');
 
+    // Контекст последней переписки. Хранится ОТДЕЛЬНЫМ ключом, потому что свойство
+    // на массиве (вроде chatHistory.__context) при JSON.stringify теряется — после
+    // перезагрузки страницы контекст становился undefined, и переписка из одного
+    // контекста (например, «Стих дня») протекала в другой (свободный чат).
+    //
+    // Возможные значения: null (свободный чат), 'topic:<id>', 'verse:<ref>'.
+    function getContext() {
+        return localStorage.getItem('blagovest_chat_context');
+    }
+    function setContext(ctx) {
+        if (ctx === null || ctx === undefined) {
+            localStorage.removeItem('blagovest_chat_context');
+        } else {
+            localStorage.setItem('blagovest_chat_context', ctx);
+        }
+    }
+
     // ============================================================
     // ССЫЛКИ НА КНИГИ ПИСАНИЯ (для интерактивных ссылок в ответах AI)
     // ============================================================
@@ -752,14 +774,69 @@
         'Деяний': 'Acts', 'Деян': 'Acts'
     };
 
+    // Превращает упоминания библейских ссылок («Мф 5:3», «Ин 14:6») в кликабельные
+    // ссылки на azbyka.ru. Принимает HTML-строку (уже после marked + DOMPurify),
+    // возвращает HTML-строку.
+    //
+    // Важно: работаем не регекспом по строке, а по DOM-узлам. Иначе если marked
+    // уже сделал ссылку из markdown-разметки [Мф 5:3](...), регексп влепил бы
+    // внутрь второй <a> — получился бы невалидный вложенный тег. Поэтому
+    // обходим только текстовые узлы, и только те, что не находятся внутри <a>.
+    const BIBLE_REF_REGEX = /(1\s*Кор|2\s*Кор|1\s*Тим|2\s*Тим|1\s*Пет|2\s*Пет|Матфея|Марка|Луки|Иоанна|Римлянам|Галатам|Ефесянам|Филиппийцам|Колоссянам|Иакова|Деяний|Мф|Мк|Лк|Ин|Иоанн|Рим|Гал|Еф|Флп|Кол|Иак|Деян)\.?\s*(\d+):(\d+(?:-\d+)?)/gi;
+
     function linkifyBible(html) {
-        const regex = /(1\s*Кор|2\s*Кор|1\s*Тим|2\s*Тим|1\s*Пет|2\s*Пет|Матфея|Марка|Луки|Иоанна|Римлянам|Галатам|Ефесянам|Филиппийцам|Колоссянам|Иакова|Деяний|Мф|Мк|Лк|Ин|Иоанн|Рим|Гал|Еф|Флп|Кол|Иак|Деян)\.?\s*(\d+):(\d+(?:-\d+)?)/gi;
-        return html.replace(regex, (match, book, chapter, verse) => {
-            const normalized = book.replace(/\s+/g, ' ').trim();
-            const bookCode = bibleBooksMap[normalized] || bibleBooksMap[normalized.replace(/\s/g, '')] || 'Jn';
-            const url = `https://azbyka.ru/biblia/?${bookCode}.${chapter}:${verse}`;
-            return `<a href="${url}" target="_blank" rel="noopener" class="bible-link">${match}</a>`;
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = html;
+
+        // Собираем все текстовые узлы, которые НЕ находятся внутри <a>.
+        const walker = document.createTreeWalker(wrapper, NodeFilter.SHOW_TEXT, {
+            acceptNode(node) {
+                if (node.parentNode && node.parentNode.closest('a')) {
+                    return NodeFilter.FILTER_REJECT;
+                }
+                return NodeFilter.FILTER_ACCEPT;
+            }
         });
+
+        const textNodes = [];
+        let n;
+        while ((n = walker.nextNode())) textNodes.push(n);
+
+        textNodes.forEach(node => {
+            const text = node.nodeValue;
+            if (!BIBLE_REF_REGEX.test(text)) return;
+            BIBLE_REF_REGEX.lastIndex = 0; // сбросить после test() с флагом /g
+
+            const frag = document.createDocumentFragment();
+            let lastIndex = 0;
+            let match;
+            while ((match = BIBLE_REF_REGEX.exec(text)) !== null) {
+                const [full, book, chapter, verse] = match;
+                const start = match.index;
+
+                if (start > lastIndex) {
+                    frag.appendChild(document.createTextNode(text.slice(lastIndex, start)));
+                }
+
+                const normalized = book.replace(/\s+/g, ' ').trim();
+                const bookCode = bibleBooksMap[normalized] || bibleBooksMap[normalized.replace(/\s/g, '')] || 'Jn';
+                const a = document.createElement('a');
+                a.href = `https://azbyka.ru/biblia/?${bookCode}.${chapter}:${verse}`;
+                a.target = '_blank';
+                a.rel = 'noopener';
+                a.className = 'bible-link';
+                a.textContent = full;
+                frag.appendChild(a);
+
+                lastIndex = start + full.length;
+            }
+            if (lastIndex < text.length) {
+                frag.appendChild(document.createTextNode(text.slice(lastIndex)));
+            }
+            node.parentNode.replaceChild(frag, node);
+        });
+
+        return wrapper.innerHTML;
     }
 
     // ============================================================
@@ -872,10 +949,11 @@
         // Контекстный ключ — verse:<ref>, чтобы возврат к тому же стиху сохранял диалог,
         // а возврат к другому стиху / теме / свободному чату — нет.
         const newContextKey = 'verse:' + v.ref;
-        if (chatHistory.__context !== undefined && chatHistory.__context !== newContextKey) {
+        const prevContext = getContext();
+        if (prevContext !== null && prevContext !== newContextKey) {
             resetHistory();
         }
-        chatHistory.__context = newContextKey;
+        setContext(newContextKey);
 
         const cc = document.getElementById('chat-container');
         cc.innerHTML = '';
@@ -900,6 +978,8 @@
     // Отдельная функция отправки: то же, что sendMessage, но текст приходит
     // программно, а в payload добавлены source/verseTag для серверной аналитики.
     async function sendVerseOfDayQuestion(text) {
+        if (isSending) return;
+        isSending = true;
         haptic.light();
         appendMessage('user', text);
         chatHistory.push({ role: "user", content: text });
@@ -915,21 +995,7 @@
                 verseRef: currentVerseOfDay ? currentVerseOfDay.ref : null
             };
 
-            const response = await fetch(FUNCTION_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-App-Token': APP_TOKEN },
-                body: JSON.stringify(payload)
-            });
-
-            if (response.status === 429 || response.status === 403 || response.status === 400) {
-                let serverMsg = '';
-                try { const errData = await response.json(); serverMsg = errData.message || ''; } catch (e) {}
-                throw new Error(serverMsg || 'Запрос отклонён сервером.');
-            }
-            if (!response.ok) throw new Error('Ошибка связи с сервером');
-
-            const data = await response.json();
-            const aiAnswer = data.message || 'Извините, не получил ответа.';
+            const { message: aiAnswer } = await postChatRequest(payload);
             appendMessage('ai', aiAnswer);
             chatHistory.push({ role: "assistant", content: aiAnswer });
             if (chatHistory.length > 12) chatHistory = chatHistory.slice(-12);
@@ -939,6 +1005,7 @@
             appendMessage('ai', 'К сожалению, произошла ошибка: ' + error.message);
             haptic.error();
         } finally {
+            isSending = false;
             setLoading(false);
         }
     }
@@ -1005,6 +1072,58 @@
         showScreen('topic');
     }
 
+    // Флаг «идёт запрос к серверу». Защищает от двойной отправки, если
+    // пользователь успел дважды нажать Enter / кнопку до того, как inputs
+    // успели задизейблиться.
+    let isSending = false;
+
+    // Таймаут запроса к функции. Yandex Cloud Function живёт 30 сек —
+    // оставляем небольшой запас на сеть, чтобы успеть показать понятную ошибку
+    // до того, как браузер сам оборвёт fetch.
+    const REQUEST_TIMEOUT_MS = 25000;
+
+    // Общая логика POST к функции с AbortController, таймаутом и единообразной
+    // обработкой ошибок (429/403/400 → сообщение сервера, таймаут → своё сообщение).
+    // Возвращает { ok: true, message } или бросает Error с понятным message.
+    async function postChatRequest(payload) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+        try {
+            const response = await fetch(FUNCTION_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-App-Token': APP_TOKEN
+                },
+                body: JSON.stringify(payload),
+                signal: controller.signal
+            });
+
+            // Особые случаи: сервер вернул понятное текстовое сообщение —
+            // показываем его пользователю, а не общее «Ошибка связи».
+            if (response.status === 429 || response.status === 403 || response.status === 400) {
+                let serverMsg = '';
+                try {
+                    const errData = await response.json();
+                    serverMsg = errData.message || '';
+                } catch (e) {}
+                throw new Error(serverMsg || 'Запрос отклонён сервером.');
+            }
+            if (!response.ok) throw new Error('Ошибка связи с сервером');
+
+            const data = await response.json();
+            return { message: data.message || 'Извините, не получил ответа.' };
+        } catch (err) {
+            // AbortError — это наш таймаут. Перепаковываем в понятное сообщение.
+            if (err.name === 'AbortError') {
+                throw new Error('Ответ занял слишком много времени. Попробуйте задать вопрос ещё раз.');
+            }
+            throw err;
+        } finally {
+            clearTimeout(timeoutId);
+        }
+    }
+
     // ============================================================
     // ЧАТ
     // ============================================================
@@ -1018,6 +1137,9 @@
     function resetHistory() {
         chatHistory = [];
         localStorage.removeItem('blagovest_chat_history');
+        // Контекст в этот момент тоже сбрасываем — конкретный новый контекст
+        // выставит вызывающая сторона через setContext(...).
+        setContext(null);
     }
 
     async function clearHistory() {
@@ -1025,6 +1147,7 @@
         if (!yes) return;
         chatHistory = [];
         localStorage.removeItem('blagovest_chat_history');
+        setContext(null);
         const cc = document.getElementById('chat-container');
         cc.innerHTML = '';
         appendMessage('ai', 'История очищена. О чём вы хотите спросить?', false);
@@ -1034,13 +1157,14 @@
     function openChat(topicContext) {
         // Если переключаемся между свободным чатом и тематическим (или наоборот) —
         // тоже считаем это сменой контекста и чистим историю.
-        // chatHistory.__context хранит маркер последнего контекста: null = свободный чат, id темы = тема.
-        const newContextKey = topicContext ? topicContext.id : null;
-        if (chatHistory.__context !== undefined && chatHistory.__context !== newContextKey) {
+        // Формат ключа: 'topic:<id>' для темы, 'free' для свободного чата,
+        // 'verse:<ref>' для стиха дня (см. openVerseOfDayChat).
+        const newContextKey = topicContext ? ('topic:' + topicContext.id) : 'free';
+        const prevContext = getContext();
+        if (prevContext !== null && prevContext !== newContextKey) {
             resetHistory();
         }
-        // Помечаем текущий контекст (свойство на массиве — в localStorage не попадёт, JSON.stringify его опускает)
-        chatHistory.__context = newContextKey;
+        setContext(newContextKey);
 
         const cc = document.getElementById('chat-container');
         cc.innerHTML = '';
@@ -1072,10 +1196,12 @@
     }
 
     async function sendMessage() {
+        if (isSending) return; // защита от двойной отправки (двойной Enter, дабл-клик, IME)
         const input = document.getElementById('userInput');
         const text = input.value.trim();
-        if (!text || text.length < 2) return;
+        if (!text) return; // пустую строку не шлём; валидация длины — на сервере
 
+        isSending = true;
         haptic.light();
         appendMessage('user', text);
         chatHistory.push({ role: "user", content: text });
@@ -1092,30 +1218,7 @@
                 topicId: currentTopic ? currentTopic.id : null
             };
 
-            const response = await fetch(FUNCTION_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-App-Token': APP_TOKEN
-                },
-                body: JSON.stringify(payload)
-            });
-
-            // Особые случаи: сервер вернул понятное текстовое сообщение —
-            // показываем его пользователю, а не общее «Ошибка связи».
-            if (response.status === 429 || response.status === 403 || response.status === 400) {
-                let serverMsg = '';
-                try {
-                    const errData = await response.json();
-                    serverMsg = errData.message || '';
-                } catch (e) {}
-                throw new Error(serverMsg || 'Запрос отклонён сервером.');
-            }
-
-            if (!response.ok) throw new Error('Ошибка связи с сервером');
-
-            const data = await response.json();
-            const aiAnswer = data.message || 'Извините, не получил ответа.';
+            const { message: aiAnswer } = await postChatRequest(payload);
 
             appendMessage('ai', aiAnswer);
             chatHistory.push({ role: "assistant", content: aiAnswer });
@@ -1127,6 +1230,7 @@
             appendMessage('ai', 'К сожалению, произошла ошибка: ' + error.message);
             haptic.error();
         } finally {
+            isSending = false;
             setLoading(false);
         }
     }
@@ -1137,8 +1241,15 @@
         msgDiv.className = `message ${role === 'user' ? 'user-message' : 'ai-message'}`;
 
         if (role === 'ai' || role === 'assistant') {
-            const html = marked.parse(text);
-            msgDiv.innerHTML = linkifyBible(html);
+            // marked → DOMPurify → linkifyBible.
+            // DOMPurify санитизирует HTML от потенциально опасных тегов/атрибутов
+            // (если LLM или будущий источник вернёт сырой HTML). linkifyBible
+            // потом работает уже с безопасным DOM.
+            const rawHtml = marked.parse(text);
+            const cleanHtml = window.DOMPurify
+                ? DOMPurify.sanitize(rawHtml, { ADD_ATTR: ['target'] })
+                : rawHtml;
+            msgDiv.innerHTML = linkifyBible(cleanHtml);
         } else {
             msgDiv.textContent = text;
         }
@@ -1162,8 +1273,13 @@
     document.getElementById('freeChatCard').addEventListener('click', () => { haptic.selection(); openChat(null); });
     document.getElementById('askAboutTopicBtn').addEventListener('click', () => { haptic.medium(); openChat(currentTopic); });
     document.getElementById('sendBtn').addEventListener('click', sendMessage); // haptic уже внутри sendMessage
-    document.getElementById('userInput').addEventListener('keypress', e => {
-        if (e.key === 'Enter') sendMessage();
+    document.getElementById('userInput').addEventListener('keydown', e => {
+        // keydown надёжнее устаревшего keypress; isComposing — чтобы Enter
+        // во время ввода через IME (китайский/японский и т.п.) не отправлял сообщение.
+        if (e.key === 'Enter' && !e.isComposing) {
+            e.preventDefault();
+            sendMessage();
+        }
     });
 
     // ============================================================
