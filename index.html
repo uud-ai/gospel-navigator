@@ -577,6 +577,14 @@
     // ============================================================
     const FUNCTION_URL = 'https://functions.yandexcloud.net/d4e7o4ivid26hthcabc9';
 
+    // Общий токен для барьера от случайных сканеров на стороне функции.
+    // Это НЕ секрет в криптографическом смысле — он виден в исходниках страницы.
+    // Цель — отсечь шум: те, кто наткнулся на URL функции и не знает про токен,
+    // получат 403 и пойдут дальше. Настоящая защита — rate limit на сервере.
+    // При смене токена нужно одновременно обновить переменную окружения
+    // APP_SHARED_TOKEN в Yandex Cloud Function.
+    const APP_TOKEN = 'bg-public-v1-7Kp9qLm3X';
+
     // ============================================================
     // TELEGRAM MINI APP (если запущено внутри Telegram)
     // ============================================================
@@ -900,9 +908,23 @@
 
             const response = await fetch(FUNCTION_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-App-Token': APP_TOKEN
+                },
                 body: JSON.stringify(payload)
             });
+
+            // Особые случаи: сервер вернул понятное текстовое сообщение —
+            // показываем его пользователю, а не общее «Ошибка связи».
+            if (response.status === 429 || response.status === 403 || response.status === 400) {
+                let serverMsg = '';
+                try {
+                    const errData = await response.json();
+                    serverMsg = errData.message || '';
+                } catch (e) {}
+                throw new Error(serverMsg || 'Запрос отклонён сервером.');
+            }
 
             if (!response.ok) throw new Error('Ошибка связи с сервером');
 
