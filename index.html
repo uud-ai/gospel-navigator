@@ -27,10 +27,44 @@
         :root {
             --primary-color: #2c3e50;
             --accent-color: #c0392b;
+            --accent-hover: #a93226;
             --bg-color: #f4f1ea;
             --chat-bg: #ffffff;
+            --surface: #ffffff;            /* фон плиток, карточек, сообщений AI, поля ввода */
             --card-border: #d6d0c4;
-            --muted: #5a5a5a;
+            --border-soft: #ddd;           /* лёгкие разделители */
+            --border-input: #ccc;
+            --text: #333;                  /* основной текст */
+            --muted: #5a5a5a;              /* приглушённый текст */
+            --muted-2: #666;
+            --spinner-track: #f3f3f3;
+            --tile-tint: #fdf6f5;          /* лёгкая подсветка при hover на free-chat */
+            --badge-bg: rgba(192, 57, 43, 0.08);
+            --badge-border: rgba(192, 57, 43, 0.2);
+            --shadow-msg: rgba(0,0,0,0.08);
+        }
+
+        /* Тёмная тема — включается классом на <body>, который ставит JS,
+           когда Telegram сообщает colorScheme === 'dark'. Сохраняем церковную
+           эстетику: тёмно-синий вместо чёрного, кремовый текст, тот же акцент. */
+        body.theme-dark {
+            --primary-color: #1a2530;      /* шапка ещё темнее */
+            --accent-color: #d65a4d;       /* акцент чуть светлее для контраста */
+            --accent-hover: #c0392b;
+            --bg-color: #243240;           /* фон страницы — тёмно-синий */
+            --chat-bg: #2f3e50;
+            --surface: #2f3e50;            /* фон карточек */
+            --card-border: #3d4f63;
+            --border-soft: #3d4f63;
+            --border-input: #4a5d73;
+            --text: #e8e2d4;               /* кремовый вместо #333 */
+            --muted: #a8b0bc;
+            --muted-2: #9aa3b0;
+            --spinner-track: #3d4f63;
+            --tile-tint: #3a2a2a;
+            --badge-bg: rgba(214, 90, 77, 0.15);
+            --badge-border: rgba(214, 90, 77, 0.35);
+            --shadow-msg: rgba(0,0,0,0.3);
         }
 
         * { box-sizing: border-box; }
@@ -40,8 +74,9 @@
             padding: 0;
             font-family: 'Roboto', sans-serif;
             background-color: var(--bg-color);
-            color: #333;
+            color: var(--text);
             -webkit-font-smoothing: antialiased;
+            transition: background-color 0.2s, color 0.2s;
         }
 
         body {
@@ -168,7 +203,7 @@
         }
 
         .tile {
-            background: white;
+            background: var(--surface);
             border: 1px solid var(--card-border);
             border-radius: 12px;
             padding: 16px 10px;
@@ -203,7 +238,7 @@
         }
 
         .free-chat-card {
-            background: white;
+            background: var(--surface);
             border: 1px dashed var(--accent-color);
             border-radius: 12px;
             padding: 16px;
@@ -213,7 +248,7 @@
         }
 
         .free-chat-card:hover {
-            background: #fdf6f5;
+            background: var(--tile-tint);
         }
 
         .free-chat-card .label {
@@ -282,7 +317,7 @@
         }
 
         .verse {
-            background: white;
+            background: var(--surface);
             border: 1px solid var(--card-border);
             border-left: 3px solid var(--accent-color);
             border-radius: 8px;
@@ -299,7 +334,7 @@
 
         .verse-text {
             font-size: 14px;
-            color: #333;
+            color: var(--text);
             line-height: 1.6;
             font-style: italic;
         }
@@ -307,7 +342,7 @@
         .commentary-text {
             font-size: 15px;
             line-height: 1.7;
-            color: #333;
+            color: var(--text);
             margin: 0 0 12px;
         }
 
@@ -326,7 +361,10 @@
             margin-top: 16px;
         }
 
-        .ask-btn:hover { background: #a93226; }
+        .ask-btn:hover { background: var(--accent-hover); }
+
+        /* В Telegram Mini App вместо этой кнопки используем нативную MainButton */
+        body.in-telegram .ask-btn { display: none; }
 
         .ask-btn i {
             margin-right: 6px;
@@ -355,7 +393,7 @@
             border-radius: 15px;
             line-height: 1.6;
             font-size: 15px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            box-shadow: 0 1px 3px var(--shadow-msg);
             word-wrap: break-word;
         }
 
@@ -369,19 +407,19 @@
         .ai-message {
             align-self: flex-start;
             background-color: var(--chat-bg);
-            color: #333;
+            color: var(--text);
             border-bottom-left-radius: 2px;
-            border: 1px solid #ddd;
+            border: 1px solid var(--border-soft);
         }
 
         .topic-badge {
             align-self: center;
-            background: rgba(192, 57, 43, 0.08);
+            background: var(--badge-bg);
             color: var(--accent-color);
             font-size: 12px;
             padding: 4px 12px;
             border-radius: 12px;
-            border: 1px solid rgba(192, 57, 43, 0.2);
+            border: 1px solid var(--badge-border);
         }
 
         .bible-link {
@@ -391,7 +429,7 @@
             border-bottom: 1px dashed var(--accent-color);
         }
 
-        .bible-link:hover { background-color: rgba(192, 57, 43, 0.08); }
+        .bible-link:hover { background-color: var(--badge-bg); }
 
         .ai-message p { margin: 8px 0; }
         .ai-message p:first-child { margin-top: 0; }
@@ -400,11 +438,11 @@
         .ai-message ul, .ai-message ol { padding-left: 20px; margin: 8px 0; }
 
         .input-area {
-            background: white;
+            background: var(--surface);
             padding: 12px 16px;
             display: flex;
             gap: 8px;
-            border-top: 1px solid #ddd;
+            border-top: 1px solid var(--border-soft);
             align-items: center;
             padding-bottom: calc(12px + env(safe-area-inset-bottom));
         }
@@ -412,14 +450,18 @@
         #userInput {
             flex: 1;
             padding: 12px 16px;
-            border: 1px solid #ccc;
+            border: 1px solid var(--border-input);
             border-radius: 25px;
             outline: none;
             font-size: 15px;
             font-family: inherit;
+            background: var(--surface);
+            color: var(--text);
         }
 
-        #userInput:focus { border-color: var(--primary-color); }
+        #userInput::placeholder { color: var(--muted-2); }
+
+        #userInput:focus { border-color: var(--accent-color); }
 
         button#sendBtn {
             background-color: var(--accent-color);
@@ -434,22 +476,22 @@
             white-space: nowrap;
         }
 
-        button#sendBtn:hover:not(:disabled) { background-color: #a93226; }
-        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        button#sendBtn:hover:not(:disabled) { background-color: var(--accent-hover); }
+        button:disabled { background-color: var(--muted-2); cursor: not-allowed; opacity: 0.6; }
 
         #loader {
             display: none;
             text-align: center;
             padding: 8px 16px;
             font-style: italic;
-            color: #666;
+            color: var(--muted-2);
             font-size: 13px;
         }
 
         .spinner {
             width: 12px;
             height: 12px;
-            border: 2px solid #f3f3f3;
+            border: 2px solid var(--spinner-track);
             border-top: 2px solid var(--accent-color);
             border-radius: 50%;
             animation: spin 1s linear infinite;
@@ -540,14 +582,67 @@
     // ============================================================
     const tg = window.Telegram?.WebApp;
     const isInTelegram = tg && tg.initData && tg.initData.length > 0;
+
+    // Применяем тему (светлая/тёмная) на основе того, что говорит Telegram.
+    // Вне Telegram — всегда светлая (сохраняем исходный дизайн).
+    function applyTheme() {
+        if (!isInTelegram) return;
+        const isDark = tg.colorScheme === 'dark';
+        document.body.classList.toggle('theme-dark', isDark);
+        // Перекрашиваем шапку и фон самого Telegram в тон нашему приложению,
+        // чтобы не было видно «шва» между нативным UI и нашим контентом.
+        try {
+            tg.setHeaderColor(isDark ? '#1a2530' : '#2c3e50');
+            tg.setBackgroundColor(isDark ? '#243240' : '#f4f1ea');
+        } catch (e) {}
+        // theme-color мета-тега тоже обновим (для iOS статусбара)
+        const meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', isDark ? '#1a2530' : '#2c3e50');
+    }
+
     if (tg) {
         try {
             tg.ready();
             tg.expand();
-            // Подстраиваем цвет шапки под наш дизайн
-            tg.setHeaderColor('#2c3e50');
-            tg.setBackgroundColor('#f4f1ea');
+            // Отключаем закрытие приложения свайпом вниз — иначе при скролле
+            // в чате/теме Telegram случайно закрывает Mini App.
+            if (typeof tg.disableVerticalSwipes === 'function') {
+                tg.disableVerticalSwipes();
+            }
+            applyTheme();
+            // Реагируем на смену темы в Telegram «на лету».
+            tg.onEvent('themeChanged', applyTheme);
         } catch (e) { /* в обычном браузере просто игнорируем */ }
+    }
+
+    if (isInTelegram) {
+        // Этот класс позволяет CSS скрыть нашу кнопку «Задать вопрос по этой теме»
+        // (вместо неё показываем нативную MainButton Telegram).
+        document.body.classList.add('in-telegram');
+    }
+
+    // --- Хелперы для тактильной отдачи (haptic feedback) ---
+    // Вне Telegram — пустые функции (no-op).
+    const haptic = {
+        light()    { try { tg?.HapticFeedback?.impactOccurred('light'); }    catch (e) {} },
+        medium()   { try { tg?.HapticFeedback?.impactOccurred('medium'); }   catch (e) {} },
+        soft()     { try { tg?.HapticFeedback?.impactOccurred('soft'); }     catch (e) {} },
+        success()  { try { tg?.HapticFeedback?.notificationOccurred('success'); } catch (e) {} },
+        error()    { try { tg?.HapticFeedback?.notificationOccurred('error'); }   catch (e) {} },
+        selection(){ try { tg?.HapticFeedback?.selectionChanged(); }         catch (e) {} }
+    };
+
+    // Замена window.confirm: внутри Telegram — нативный диалог, в браузере — обычный confirm.
+    function askConfirm(text) {
+        return new Promise(resolve => {
+            if (isInTelegram && typeof tg.showConfirm === 'function') {
+                try {
+                    tg.showConfirm(text, ok => resolve(!!ok));
+                    return;
+                } catch (e) { /* fallback ниже */ }
+            }
+            resolve(window.confirm(text));
+        });
     }
 
     // ============================================================
@@ -625,6 +720,27 @@
             } catch (e) {}
         }
 
+        // MainButton Telegram: показываем «Задать вопрос…» только на экране темы,
+        // на остальных экранах прячем.
+        if (isInTelegram && tg.MainButton) {
+            try {
+                if (name === 'topic' && currentTopic) {
+                    tg.MainButton.setText('Задать вопрос по теме');
+                    tg.MainButton.show();
+                } else {
+                    tg.MainButton.hide();
+                }
+            } catch (e) {}
+        }
+
+        // SettingsButton показываем только в чате — там она ведёт на «Очистить историю».
+        if (isInTelegram && tg.SettingsButton) {
+            try {
+                if (name === 'chat') tg.SettingsButton.show();
+                else tg.SettingsButton.hide();
+            } catch (e) {}
+        }
+
         window.scrollTo(0, 0);
     }
 
@@ -649,7 +765,7 @@
                 <div class="tile-icon"><i class="ti ${topic.icon}"></i></div>
                 <div class="tile-title">${topic.title}</div>
             `;
-            tile.addEventListener('click', () => openTopic(topic.id));
+            tile.addEventListener('click', () => { haptic.selection(); openTopic(topic.id); });
             grid.appendChild(tile);
         });
     }
@@ -713,14 +829,15 @@
         localStorage.removeItem('blagovest_chat_history');
     }
 
-    function clearHistory() {
-        const yes = confirm('Очистить историю переписки?');
+    async function clearHistory() {
+        const yes = await askConfirm('Очистить историю переписки?');
         if (!yes) return;
         chatHistory = [];
         localStorage.removeItem('blagovest_chat_history');
         const cc = document.getElementById('chat-container');
         cc.innerHTML = '';
         appendMessage('ai', 'История очищена. О чём вы хотите спросить?', false);
+        haptic.success();
     }
 
     function openChat(topicContext) {
@@ -768,6 +885,7 @@
         const text = input.value.trim();
         if (!text || text.length < 2) return;
 
+        haptic.light();
         appendMessage('user', text);
         chatHistory.push({ role: "user", content: text });
         saveHistory();
@@ -796,8 +914,10 @@
 
             if (chatHistory.length > 12) chatHistory = chatHistory.slice(-12);
             saveHistory();
+            haptic.success();
         } catch (error) {
             appendMessage('ai', 'К сожалению, произошла ошибка: ' + error.message);
+            haptic.error();
         } finally {
             setLoading(false);
         }
@@ -829,20 +949,39 @@
     // ============================================================
     // СЛУШАТЕЛИ СОБЫТИЙ
     // ============================================================
-    document.getElementById('backBtn').addEventListener('click', goBack);
-    document.getElementById('clearBtn').addEventListener('click', clearHistory);
-    document.getElementById('freeChatCard').addEventListener('click', () => openChat(null));
-    document.getElementById('askAboutTopicBtn').addEventListener('click', () => openChat(currentTopic));
-    document.getElementById('sendBtn').addEventListener('click', sendMessage);
+    document.getElementById('backBtn').addEventListener('click', () => { haptic.light(); goBack(); });
+    document.getElementById('clearBtn').addEventListener('click', () => { haptic.light(); clearHistory(); });
+    document.getElementById('freeChatCard').addEventListener('click', () => { haptic.selection(); openChat(null); });
+    document.getElementById('askAboutTopicBtn').addEventListener('click', () => { haptic.medium(); openChat(currentTopic); });
+    document.getElementById('sendBtn').addEventListener('click', sendMessage); // haptic уже внутри sendMessage
     document.getElementById('userInput').addEventListener('keypress', e => {
         if (e.key === 'Enter') sendMessage();
     });
 
-    // Системная кнопка «Назад» в Telegram Mini App
-    if (isInTelegram && tg.BackButton) {
-        try {
-            tg.BackButton.onClick(goBack);
-        } catch (e) {}
+    // ============================================================
+    // ИНТЕГРАЦИЯ С НАТИВНЫМИ КНОПКАМИ TELEGRAM
+    // Регистрируем обработчики один раз — иначе одно нажатие сработает многократно.
+    // ============================================================
+    if (isInTelegram) {
+        // BackButton — системная стрелка «Назад» в шапке Telegram
+        if (tg.BackButton) {
+            try { tg.BackButton.onClick(() => { haptic.light(); goBack(); }); } catch (e) {}
+        }
+        // MainButton — нижняя цветная кнопка Telegram, используем на экране темы
+        if (tg.MainButton) {
+            try {
+                tg.MainButton.onClick(() => {
+                    if (currentScreen === 'topic' && currentTopic) {
+                        haptic.medium();
+                        openChat(currentTopic);
+                    }
+                });
+            } catch (e) {}
+        }
+        // SettingsButton — троеточие в углу, ведёт на «Очистить историю»
+        if (tg.SettingsButton) {
+            try { tg.SettingsButton.onClick(() => { haptic.light(); clearHistory(); }); } catch (e) {}
+        }
     }
 
     // ============================================================
