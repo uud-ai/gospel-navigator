@@ -1282,6 +1282,27 @@
         }
     });
 
+    // Делегат на клики по ссылкам внутри сообщений чата.
+    // В Mini App обычный target="_blank" работает нестабильно (особенно на iOS —
+    // webview блокирует popup без user gesture в нужном фрейме). Правильный путь —
+    // tg.openLink для внешних http(s) и tg.openTelegramLink для t.me/...
+    // Делегат покрывает и наши azbyka-ссылки из linkifyBible, и любые ссылки,
+    // которые LLM мог вернуть в markdown-ответе (после marked → DOMPurify).
+    // Вне Telegram (отладка в обычном браузере) — fallback на дефолтное поведение.
+    document.getElementById('chat-container').addEventListener('click', e => {
+        const a = e.target.closest('a');
+        if (!a) return;
+        const url = a.href;
+        if (!url || !/^https?:\/\//i.test(url)) return; // mailto:, tg://, прочее — оставляем браузеру
+        if (!isInTelegram || !tg.openLink) return; // fallback на target="_blank"
+        e.preventDefault();
+        if (/^https?:\/\/t\.me\//i.test(url)) {
+            try { tg.openTelegramLink(url); } catch (err) { window.open(url, '_blank'); }
+        } else {
+            try { tg.openLink(url); } catch (err) { window.open(url, '_blank'); }
+        }
+    });
+
     // ============================================================
     // ИНТЕГРАЦИЯ С НАТИВНЫМИ КНОПКАМИ TELEGRAM
     // Регистрируем обработчики один раз — иначе одно нажатие сработает многократно.
