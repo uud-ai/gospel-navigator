@@ -167,11 +167,18 @@
         /* === ЭКРАНЫ === */
         .screen {
             display: none;
-            flex: 1;
-            flex-direction: column;
         }
 
         .screen.active {
+            display: block;
+        }
+
+        /* Чат — единственный экран, которому нужен flex-layout:
+           внутри есть растягивающийся #chat-container со скроллом
+           и прилипший к низу .input-area. Home и topic — обычный поток.
+           Сами свойства flex для #screen-chat (flex: 1; flex-direction: column)
+           заданы ниже, в секции «=== ЧАТ ===». */
+        #screen-chat.active {
             display: flex;
         }
 
@@ -439,6 +446,7 @@
         /* === ЧАТ === */
         #screen-chat {
             flex: 1;
+            flex-direction: column;
             min-height: 0;
         }
 
@@ -859,7 +867,22 @@
             headerTitle.textContent = currentTopic ? currentTopic.title : 'Тема';
         } else if (name === 'chat') {
             backBtn.classList.add('visible');
-            headerTitle.textContent = 'Беседа';
+            // При длинной переписке начальный «бейдж» контекста уплывает наверх
+            // вместе со скроллом — а шапка остаётся видна всегда. Поэтому дублируем
+            // в неё короткий маркер того, о чём идёт разговор. Источник истины —
+            // ключ контекста, сохранённый через setContext: 'verse:<ref>', 'topic:<id>'
+            // или 'free'. Это надёжнее, чем смотреть на currentTopic/currentVerseOfDay,
+            // потому что те живут независимо от того, какой чат сейчас активен.
+            const ctx = getContext();
+            if (ctx && ctx.startsWith('verse:')) {
+                headerTitle.textContent = ctx.slice('verse:'.length);
+            } else if (ctx && ctx.startsWith('topic:')) {
+                const topicId = ctx.slice('topic:'.length);
+                const t = (typeof TOPICS !== 'undefined') ? TOPICS.find(x => x.id === topicId) : null;
+                headerTitle.textContent = t ? t.title : 'Беседа';
+            } else {
+                headerTitle.textContent = 'Беседа';
+            }
             setTimeout(() => {
                 const cc = document.getElementById('chat-container');
                 cc.scrollTop = cc.scrollHeight;
