@@ -66,7 +66,7 @@
             --muted: #a8b0bc;
             --muted-2: #9aa3b0;
             --spinner-track: #3d4f63;
-            --tile-tint: #3a2a2a;
+            --tile-tint: rgba(214, 90, 77, 0.15);   /* полупрозрачный акцент — согласуется с --badge-bg */
             --badge-bg: rgba(214, 90, 77, 0.15);
             --badge-border: rgba(214, 90, 77, 0.35);
             --shadow-msg: rgba(0,0,0,0.3);
@@ -540,13 +540,21 @@
             background-color: var(--accent-color);
             color: white;
             border: none;
-            padding: 10px 20px;
-            border-radius: 25px;
+            /* Круглая кнопка с иконкой-самолётиком (ti-send). Высота
+               подобрана так, чтобы вертикально совпасть с инпутом
+               (12+15+12 ≈ 39px). flex-shrink: 0 — чтобы при длинном
+               содержимом инпута кнопка не сжималась в овал. */
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
             cursor: pointer;
-            font-weight: 500;
-            font-size: 14px;
+            font-size: 18px;
             font-family: inherit;
-            white-space: nowrap;
+            flex-shrink: 0;
+            padding: 0;
         }
 
         button#sendBtn:hover:not(:disabled) { background-color: var(--accent-hover); }
@@ -639,8 +647,16 @@
         <div class="spinner"></div> Обращаюсь к Писанию...
     </div>
     <div class="input-area">
-        <input type="text" id="userInput" placeholder="Спросите о Евангелии...">
-        <button id="sendBtn">Спросить</button>
+        <input type="text" id="userInput"
+               placeholder="Спросите..."
+               enterkeyhint="send"
+               autocomplete="off"
+               autocorrect="off"
+               autocapitalize="sentences"
+               spellcheck="false">
+        <button id="sendBtn" aria-label="Отправить">
+            <i class="ti ti-send" aria-hidden="true"></i>
+        </button>
     </div>
 </div>
 
