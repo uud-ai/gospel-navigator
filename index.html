@@ -36,6 +36,9 @@
             --bg-color: #f4f1ea;
             --chat-bg: #ffffff;
             --surface: #ffffff;            /* фон плиток, карточек, сообщений AI, поля ввода */
+            --tile-bg: #ffffff;            /* фон плиток тем — приподнятая поверхность.
+                                              В светлой теме совпадает с --surface (белая на бежевом фоне).
+                                              В тёмной — светлее --surface, чтобы плитки не сливались с фоном. */
             --card-border: #d6d0c4;
             --border-soft: #ddd;           /* лёгкие разделители */
             --border-input: #ccc;
@@ -59,6 +62,7 @@
             --bg-color: #243240;           /* фон страницы — тёмно-синий */
             --chat-bg: #2f3e50;
             --surface: #2f3e50;            /* фон карточек */
+            --tile-bg: #3a4a5e;            /* плитки светлее --surface — чтобы не сливались с фоном страницы */
             --card-border: #3d4f63;
             --border-soft: #3d4f63;
             --border-input: #4a5d73;
@@ -195,7 +199,9 @@
         .intro-greeting {
             font-family: 'Playfair Display', serif;
             font-size: 22px;
-            color: var(--primary-color);
+            /* --primary-color архитектурно — фон шапки и пузырька юзера, а не цвет текста.
+               На светлой/бежевой поверхности он читается случайно, в тёмной теме сливается. */
+            color: var(--text);
             margin: 0 0 6px;
             font-style: italic;
         }
@@ -215,7 +221,7 @@
         }
 
         .tile {
-            background: var(--surface);
+            background: var(--tile-bg);
             border: 1px solid var(--card-border);
             border-radius: 12px;
             padding: 16px 10px;
@@ -243,8 +249,10 @@
         }
 
         .tile-title {
+            /* В светлой теме --text это #333, читается на белом.
+               В тёмной --text это кремовый #e8e2d4, читается на #3a4a5e. */
             font-size: 13px;
-            color: var(--primary-color);
+            color: var(--text);
             font-weight: 500;
             line-height: 1.25;
         }
@@ -361,7 +369,7 @@
         .topic-title {
             font-family: 'Playfair Display', serif;
             font-size: 24px;
-            color: var(--primary-color);
+            color: var(--text);
             margin: 0 0 8px;
         }
 
