@@ -16,8 +16,8 @@
     <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%232c3e50%22/><text x=%2250%%22 y=%2250%%22 font-size=%2265%22 text-anchor=%22middle%22 dominant-baseline=%22central%22 fill=%22%23f4f1ea%22>✝</text></svg>">
 
     <!-- Шрифты, Markdown, иконки Tabler -->
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.0.0/tabler-icons.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;0,900;1,600;1,700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.48.0/dist/tabler-icons.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <!-- DOMPurify — санитизация HTML после marked. Защищает от XSS, если LLM
          (или будущий источник вроде commentaries) вернёт сырой HTML. Внутри
@@ -31,7 +31,9 @@
     <style>
         :root {
             --primary-color: #2c3e50;
+            --primary-color-2: #1f2e3d;    /* тёмный конец градиента шапки */
             --accent-color: #c0392b;
+            --accent-color-2: #d9574a;     /* светлый конец градиентов на акценте */
             --accent-hover: #a93226;
             --bg-color: #f4f1ea;
             --chat-bg: #ffffff;
@@ -50,6 +52,10 @@
             --badge-bg: rgba(192, 57, 43, 0.08);
             --badge-border: rgba(192, 57, 43, 0.2);
             --shadow-msg: rgba(0,0,0,0.08);
+            --shadow-soft: 0 4px 14px rgba(44,62,80,0.08);
+            --shadow-elevated: 0 14px 32px rgba(44,62,80,0.12), 0 2px 8px rgba(44,62,80,0.06);
+            --ring: rgba(192,57,43,0.35);
+            --spotlight: rgba(44,62,80,0.05);
         }
 
         /* Тёмная тема — включается классом на <body>, который ставит JS,
@@ -57,7 +63,9 @@
            эстетику: тёмно-синий вместо чёрного, кремовый текст, тот же акцент. */
         body.theme-dark {
             --primary-color: #1a2530;      /* шапка ещё темнее */
+            --primary-color-2: #11181f;
             --accent-color: #d65a4d;       /* акцент чуть светлее для контраста */
+            --accent-color-2: #e97a6c;
             --accent-hover: #c0392b;
             --bg-color: #243240;           /* фон страницы — тёмно-синий */
             --chat-bg: #2f3e50;
@@ -74,6 +82,10 @@
             --badge-bg: rgba(214, 90, 77, 0.15);
             --badge-border: rgba(214, 90, 77, 0.35);
             --shadow-msg: rgba(0,0,0,0.3);
+            --shadow-soft: 0 4px 16px rgba(0,0,0,0.35);
+            --shadow-elevated: 0 16px 36px rgba(0,0,0,0.5), 0 2px 10px rgba(0,0,0,0.35);
+            --ring: rgba(214,90,77,0.45);
+            --spotlight: rgba(214,90,77,0.08);
         }
 
         * { box-sizing: border-box; }
@@ -97,7 +109,7 @@
 
         /* === ШАПКА === */
         header {
-            background-color: var(--primary-color);
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-color-2));
             color: white;
             padding: 12px 16px;
             display: flex;
@@ -107,6 +119,33 @@
             position: sticky;
             top: 0;
             z-index: 10;
+        }
+
+        /* Тонкая акцентная линия на стыке шапки и контента — премиальный штрих,
+           увязывает тёмную шапку с акцентным цветом приложения. */
+        header::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: -1px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--accent-color) 50%, transparent);
+            opacity: 0.55;
+        }
+
+        .brand-mark {
+            font-family: 'Playfair Display', serif;
+            font-size: 17px;
+            color: var(--accent-color-2);
+            flex-shrink: 0;
+            line-height: 1;
+        }
+
+        /* На экранах темы/чата заголовок меняется на название темы —
+           фирменный крестик там визуально избыточен, прячем его. */
+        .back-btn.visible ~ .brand-mark {
+            display: none;
         }
 
         .header-left {
@@ -198,12 +237,23 @@
 
         .intro-greeting {
             font-family: 'Playfair Display', serif;
-            font-size: 22px;
+            font-size: 24px;
+            font-weight: 600;
             /* --primary-color архитектурно — фон шапки и пузырька юзера, а не цвет текста.
                На светлой/бежевой поверхности он читается случайно, в тёмной теме сливается. */
             color: var(--text);
-            margin: 0 0 6px;
+            margin: 0 0 10px;
             font-style: italic;
+        }
+
+        .intro-greeting::after {
+            content: '';
+            display: block;
+            width: 36px;
+            height: 2px;
+            margin: 10px auto 0;
+            background: linear-gradient(90deg, transparent, var(--accent-color), transparent);
+            border-radius: 2px;
         }
 
         .intro-subtitle {
@@ -223,29 +273,65 @@
         .tile {
             background: var(--tile-bg);
             border: 1px solid var(--card-border);
-            border-radius: 12px;
-            padding: 16px 10px;
+            border-radius: 14px;
+            padding: 18px 10px;
             text-align: center;
             cursor: pointer;
-            transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+            transition: transform 0.2s ease, border-color 0.2s, box-shadow 0.2s;
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 6px;
-            min-height: 92px;
+            gap: 8px;
+            min-height: 96px;
             justify-content: center;
+            position: relative;
+            overflow: hidden;
         }
 
-        .tile:hover, .tile:active {
+        /* Премиальный «блик»: диагональная полоса света, проходящая по плитке
+           при hover/focus — как отражение на лакированной поверхности.
+           Чисто декоративно, не мешает кликам (pointer-events: none). */
+        .tile::after {
+            content: '';
+            position: absolute;
+            top: 0; left: -60%;
+            width: 40%; height: 100%;
+            background: linear-gradient(115deg, transparent, rgba(255,255,255,0.35), transparent);
+            transform: skewX(-20deg);
+            pointer-events: none;
+            opacity: 0;
+        }
+
+        body.theme-dark .tile::after {
+            background: linear-gradient(115deg, transparent, rgba(255,255,255,0.08), transparent);
+        }
+
+        .tile:hover, .tile:active, .tile:focus-visible {
             border-color: var(--accent-color);
-            transform: translateY(-1px);
-            box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-soft);
+        }
+
+        @media (prefers-reduced-motion: no-preference) {
+            .tile:hover::after, .tile:focus-visible::after {
+                opacity: 1;
+                left: 130%;
+                transition: left 0.6s ease, opacity 0.6s ease;
+            }
         }
 
         .tile-icon {
-            font-size: 28px;
+            font-size: 22px;
             color: var(--accent-color);
             line-height: 1;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--badge-bg);
+            border: 1px solid var(--badge-border);
         }
 
         .tile-title {
@@ -260,15 +346,17 @@
         .free-chat-card {
             background: var(--surface);
             border: 1px dashed var(--accent-color);
-            border-radius: 12px;
+            border-radius: 14px;
             padding: 16px;
             text-align: center;
             cursor: pointer;
-            transition: background 0.15s;
+            transition: background 0.2s, box-shadow 0.2s, transform 0.2s;
         }
 
-        .free-chat-card:hover {
+        .free-chat-card:hover, .free-chat-card:focus-visible {
             background: var(--tile-tint);
+            box-shadow: var(--shadow-soft);
+            transform: translateY(-1px);
         }
 
         .free-chat-card .label {
@@ -299,6 +387,7 @@
             border-radius: 12px;
             padding: 14px 16px 12px;
             margin-bottom: 16px;
+            box-shadow: var(--shadow-soft);
         }
 
         .verse-of-day-label {
@@ -429,7 +518,7 @@
         .ask-btn {
             display: block;
             width: 100%;
-            background: var(--accent-color);
+            background: linear-gradient(135deg, var(--accent-color-2), var(--accent-color));
             color: white;
             border: none;
             padding: 14px;
@@ -437,11 +526,13 @@
             font-size: 15px;
             font-weight: 500;
             cursor: pointer;
-            transition: background 0.2s;
+            transition: filter 0.2s, transform 0.15s, box-shadow 0.2s;
             margin-top: 16px;
+            box-shadow: var(--shadow-soft);
         }
 
-        .ask-btn:hover { background: var(--accent-hover); }
+        .ask-btn:hover, .ask-btn:focus-visible { filter: brightness(1.05); }
+        .ask-btn:active { transform: scale(0.98); }
 
         /* В Telegram Mini App вместо этой кнопки используем нативную MainButton */
         body.in-telegram .ask-btn { display: none; }
@@ -545,7 +636,7 @@
         #userInput:focus { border-color: var(--accent-color); }
 
         button#sendBtn {
-            background-color: var(--accent-color);
+            background: linear-gradient(135deg, var(--accent-color-2), var(--accent-color));
             color: white;
             border: none;
             /* Круглая кнопка с иконкой-самолётиком (ti-send). Высота
@@ -565,8 +656,9 @@
             padding: 0;
         }
 
-        button#sendBtn:hover:not(:disabled) { background-color: var(--accent-hover); }
-        button:disabled { background-color: var(--muted-2); cursor: not-allowed; opacity: 0.6; }
+        button#sendBtn:hover:not(:disabled) { filter: brightness(1.08); }
+        button#sendBtn:active:not(:disabled) { transform: scale(0.94); }
+        button:disabled { background-color: var(--muted-2); background-image: none; cursor: not-allowed; opacity: 0.6; }
 
         #loader {
             display: none;
@@ -593,7 +685,73 @@
 
         /* На больших экранах ограничиваем ширину для удобства чтения */
         @media (min-width: 600px) {
-            body { max-width: 480px; margin: 0 auto; box-shadow: 0 0 30px rgba(0,0,0,0.05); }
+            body { max-width: 480px; margin: 0 auto; box-shadow: var(--shadow-elevated); position: relative; }
+        }
+
+        /* === ФОКУС С КЛАВИАТУРЫ === */
+        /* Явное кольцо фокуса на интерактивных элементах без встроенного —
+           плитки и free-chat-card теперь доступны с клавиатуры (tabindex в JS). */
+        .tile:focus-visible,
+        .free-chat-card:focus-visible,
+        .header-btn:focus-visible,
+        .back-btn:focus-visible,
+        .ask-btn:focus-visible,
+        .verse-of-day-action:focus-visible,
+        button#sendBtn:focus-visible,
+        #userInput:focus-visible {
+            outline: 2px solid var(--ring);
+            outline-offset: 2px;
+        }
+
+        /* === ДЕСКТОПНЫЙ "СПОТЛАЙТ" ЗА ПРИЛОЖЕНИЕМ === */
+        /* Мягкое пятно света вокруг курсора позади узкой колонки приложения —
+           единственный «фирменный» интерактивный эффект, не мешает контенту,
+           виден только на широких экранах с мышью и выключается по
+           prefers-reduced-motion. Координаты --spot-x/--spot-y обновляет JS. */
+        @media (min-width: 600px) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+            body::before {
+                content: '';
+                position: fixed;
+                inset: 0;
+                z-index: -1;
+                background: radial-gradient(600px circle at var(--spot-x, 50%) var(--spot-y, 20%), var(--spotlight), transparent 60%);
+                transition: background 0.3s ease;
+            }
+        }
+
+        /* === ПОЯВЛЕНИЕ ЭКРАНОВ И КАРТОЧЕК === */
+        @media (prefers-reduced-motion: no-preference) {
+            @keyframes fadeSlideUp {
+                from { opacity: 0; transform: translateY(10px); }
+                to   { opacity: 1; transform: translateY(0); }
+            }
+
+            .screen.active { animation: fadeSlideUp 0.35s ease both; }
+            .intro { animation: fadeSlideUp 0.4s ease both; }
+            .verse-of-day { animation: fadeSlideUp 0.45s ease both 0.05s; }
+            .free-chat-card { animation: fadeSlideUp 0.4s ease both 0.1s; }
+            .message { animation: fadeSlideUp 0.25s ease both; }
+            .verse { animation: fadeSlideUp 0.35s ease both; }
+            .commentary-text { animation: fadeSlideUp 0.35s ease both; }
+            .topic-header { animation: fadeSlideUp 0.35s ease both; }
+
+            /* Плитки тем «влетают» по очереди, не все сразу — создаёт ощущение
+               цельной композиции, а не мгновенного рендера списка. */
+            .tiles-grid .tile { animation: fadeSlideUp 0.4s ease both; }
+            .tiles-grid .tile:nth-child(1)  { animation-delay: 0.06s; }
+            .tiles-grid .tile:nth-child(2)  { animation-delay: 0.09s; }
+            .tiles-grid .tile:nth-child(3)  { animation-delay: 0.12s; }
+            .tiles-grid .tile:nth-child(4)  { animation-delay: 0.15s; }
+            .tiles-grid .tile:nth-child(5)  { animation-delay: 0.18s; }
+            .tiles-grid .tile:nth-child(6)  { animation-delay: 0.21s; }
+            .tiles-grid .tile:nth-child(7)  { animation-delay: 0.24s; }
+            .tiles-grid .tile:nth-child(8)  { animation-delay: 0.27s; }
+            .tiles-grid .tile:nth-child(9)  { animation-delay: 0.30s; }
+            .tiles-grid .tile:nth-child(10) { animation-delay: 0.33s; }
+            .tiles-grid .tile:nth-child(11) { animation-delay: 0.36s; }
+            .tiles-grid .tile:nth-child(12) { animation-delay: 0.39s; }
+            .tiles-grid .tile:nth-child(13) { animation-delay: 0.42s; }
+            .tiles-grid .tile:nth-child(14) { animation-delay: 0.45s; }
         }
     </style>
 </head>
@@ -602,6 +760,7 @@
 <header>
     <div class="header-left">
         <button class="back-btn" id="backBtn" aria-label="Назад">‹</button>
+        <span class="brand-mark" aria-hidden="true">✝</span>
         <h1 id="headerTitle">Благовест</h1>
     </div>
     <div class="header-actions">
@@ -619,7 +778,7 @@
          не загрузился — блок остаётся пустым и не виден. -->
     <div id="verseOfDay"></div>
     <div class="tiles-grid" id="tilesGrid"></div>
-    <div class="free-chat-card" id="freeChatCard">
+    <div class="free-chat-card" id="freeChatCard" role="button" tabindex="0" aria-label="Спросить свободно">
         <div class="label">или</div>
         <div class="action"><i class="ti ti-messages"></i>Спросить свободно</div>
     </div>
@@ -1066,11 +1225,21 @@
         TOPICS.forEach(topic => {
             const tile = document.createElement('div');
             tile.className = 'tile';
+            tile.setAttribute('role', 'button');
+            tile.setAttribute('tabindex', '0');
+            tile.setAttribute('aria-label', topic.title);
             tile.innerHTML = `
                 <div class="tile-icon"><i class="ti ${topic.icon}"></i></div>
                 <div class="tile-title">${topic.title}</div>
             `;
             tile.addEventListener('click', () => { haptic.selection(); openTopic(topic.id); });
+            tile.addEventListener('keydown', e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    haptic.selection();
+                    openTopic(topic.id);
+                }
+            });
             grid.appendChild(tile);
         });
     }
@@ -1318,6 +1487,13 @@
     document.getElementById('backBtn').addEventListener('click', () => { haptic.light(); goBack(); });
     document.getElementById('clearBtn').addEventListener('click', () => { haptic.light(); clearHistory(); });
     document.getElementById('freeChatCard').addEventListener('click', () => { haptic.selection(); openChat(null); });
+    document.getElementById('freeChatCard').addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            haptic.selection();
+            openChat(null);
+        }
+    });
     document.getElementById('askAboutTopicBtn').addEventListener('click', () => { haptic.medium(); openChat(currentTopic); });
     document.getElementById('sendBtn').addEventListener('click', sendMessage); // haptic уже внутри sendMessage
     document.getElementById('userInput').addEventListener('keydown', e => {
@@ -1374,6 +1550,22 @@
         if (tg.SettingsButton) {
             try { tg.SettingsButton.onClick(() => { haptic.light(); clearHistory(); }); } catch (e) {}
         }
+    }
+
+    // ============================================================
+    // ДЕСКТОПНЫЙ "СПОТЛАЙТ" ЗА ПРИЛОЖЕНИЕМ
+    // Обновляет CSS-переменные --spot-x/--spot-y на <body>, которые читает
+    // body::before (см. <style>). Эффект сам выключен в CSS на тач-устройствах
+    // и при prefers-reduced-motion — слушатель здесь просто не навешиваем,
+    // чтобы не тратить ресурсы там, где эффекта и так не будет видно.
+    // ============================================================
+    const supportsSpotlight = window.matchMedia('(pointer: fine)').matches
+        && window.matchMedia('(prefers-reduced-motion: no-preference)').matches;
+    if (supportsSpotlight) {
+        document.addEventListener('mousemove', e => {
+            document.body.style.setProperty('--spot-x', e.clientX + 'px');
+            document.body.style.setProperty('--spot-y', e.clientY + 'px');
+        }, { passive: true });
     }
 
     // ============================================================
