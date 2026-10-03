@@ -889,6 +889,20 @@
         document.body.classList.add('in-telegram');
     }
 
+    // ============================================================
+    // ОФЛАЙН-КЭШ (SERVICE WORKER)
+    // Путь относительный — scope подстраивается под то, где лежит файл
+    // (корень на GitHub Pages gospel-navigator, /blagovest/ на сайте
+    // храма), без хардкода. SW кэширует только статику (темы, стих дня,
+    // шрифты/иконки) — чат всё равно нужен живой, см. sw.js.
+    // register() сам отказывает на file:// / небезопасном http — .catch
+    // просто проглатывает это, без влияния на остальное приложение.
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('sw.js').catch(() => {});
+        });
+    }
+
     // --- Хелперы для тактильной отдачи (haptic feedback) ---
     // Вне Telegram — пустые функции (no-op).
     const haptic = {
