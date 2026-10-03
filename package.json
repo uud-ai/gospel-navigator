@@ -1,0 +1,15 @@
+{
+  "name": "gospel-navigator",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Благовест — Telegram Mini App, ИИ-чат по Евангелию с толкованиями блж. Феофилакта Болгарского",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build:gospels": "python scripts/get_all_gospels.py",
+    "build:commentaries": "node scripts/build_commentaries.js",
+    "build:commentaries-embeddings": "node scripts/build_commentaries_embeddings.js"
+  }
+}
