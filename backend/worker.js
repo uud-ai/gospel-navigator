@@ -38,8 +38,16 @@ const CHAT_MAX_TOKENS = 700;
 const MAX_MESSAGES = 12;
 const MAX_MESSAGE_LENGTH = 2000;
 const MAX_BODY_LENGTH = 20000;
-const TOP_K_VERSES = 5;
-const TOP_K_COMMENTARY = 3;
+const TOP_K_VERSES = 8;
+const TOP_K_COMMENTARY = 5;
+// Поиск — по отдельным стихам/фрагментам, не по отрывкам, так что короткие
+// лексические совпадения (напр. «блудный» в запросе -> стихи про «блуд»/
+// «блудниц», не связанные с притчей о блудном сыне) иногда дают скор выше
+// подлинного совпадения. Порог не отличает одно от другого (см. замеры в
+// памяти проекта), но отсекает совсем случайный шум — тогда
+// buildContextMessage честно пишет «ничего не найдено», и модель отвечает
+// по общим знаниям вместо того, чтобы путаться в нерелевантных цитатах.
+const MIN_SIMILARITY = 0.35;
 
 // chisle: грубый rate limit в памяти изолята — переживает только тёплый
 // изолят одного воркера, не распределённый между регионами/перезапусками.
@@ -271,7 +279,7 @@ function cosineSimilarity(a, b) {
 function topKIndices(queryVec, embeddings, k) {
     const scored = embeddings.map((vec, i) => ({ i, score: cosineSimilarity(queryVec, vec) }));
     scored.sort((a, b) => b.score - a.score);
-    return scored.slice(0, k).map((s) => s.i);
+    return scored.slice(0, k).filter((s) => s.score >= MIN_SIMILARITY).map((s) => s.i);
 }
 
 function buildContextMessage(verses, commentaries) {
