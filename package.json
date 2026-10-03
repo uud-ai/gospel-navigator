@@ -8,7 +8,7 @@
     "node": ">=18"
   },
   "scripts": {
-    "build:gospels": "python scripts/get_all_gospels.py",
+    "build:nt": "python scripts/get_nt.py",
     "build:commentaries": "node scripts/build_commentaries.js",
     "build:commentaries-embeddings": "node scripts/build_commentaries_embeddings.js"
   }

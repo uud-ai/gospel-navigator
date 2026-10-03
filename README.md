@@ -28,12 +28,16 @@ index.html          — вся клиентская логика (UI, чат, р
 topics.js            — 14 тем, каждая со ссылками на стихи и вступлением
 verses_of_day.js     — 40 стихов «на каждый день», ротация по дате
 data/
-  bible.json                  — 4 Евангелия, синодальный перевод, 3766 стихов
-  commentaries.json           — толкования блж. Феофилакта, 3734 фрагмента
-  bible_embeddings.json       — эмбеддинги стихов (см. «Пробелы» ниже)
+  bible.json                  — весь Новый Завет (27 книг), синодальный
+                                 перевод, 7955 стихов
+  commentaries.json           — толкования блж. Феофилакта на 4 Евангелия,
+                                 3734 фрагмента
+  bible_embeddings.json       — эмбеддинги СТАРОЙ версии bible.json
+                                 (только Евангелия) — сейчас не соответствуют
+                                 файлу выше, см. «Backend»
   commentaries_embeddings.json — эмбеддинги толкований
 scripts/
-  get_all_gospels.py              — собирает data/bible.json из внешнего репозитория
+  get_nt.py                        — собирает data/bible.json (весь НЗ) из внешнего репозитория
   build_commentaries.js           — собирает data/commentaries.json с azbyka.ru
   build_commentaries_embeddings.js — считает эмбеддинги для commentaries.json
 backend/
@@ -58,11 +62,20 @@ backend/
 (512 измерений) известны со слов автора, но воспроизвести файл с нуля
 сейчас нечем.
 
+**`data/bible_embeddings.json` сейчас устарел относительно `data/bible.json`.**
+При загрузке полного Нового Завета (см. «Известные пробелы») заодно
+исправлен баг старого скрипта (пропущенные стихи в 11 главах Евангелий —
+см. git-историю `data/bible.json`), из-за чего индексы стихов в файле
+сдвинулись, а 23 новые книги вообще не заэмбеддены. Поиск по эмбеддингам в
+`function.js` будет возвращать нерелевантные/смещённые фрагменты, пока
+`bible_embeddings.json` не пересчитан с нуля под новый `bible.json` —
+платный шаг, выполняется отдельно по команде автора.
+
 ## Данные и источники
 
 | Файл | Источник | Статус лицензии |
 |---|---|---|
-| `data/bible.json` | [thiagobodruk/bible](https://github.com/thiagobodruk/bible) (`ru_synodal.json`), собран через `scripts/get_all_gospels.py` | Репозиторий-источник — MIT. Сам синодальный перевод (XIX век) — общественное достояние. |
+| `data/bible.json` | [thiagobodruk/bible](https://github.com/thiagobodruk/bible) (`json/ru_synod.json`), собран через `scripts/get_nt.py` | Репозиторий-источник — MIT. Сам синодальный перевод (XIX век) — общественное достояние. |
 | `data/commentaries.json` | [azbyka.ru](https://azbyka.ru), «Толкование на Евангелие» блж. Феофилакта Болгарского, собран через `scripts/build_commentaries.js` | Толкование (XI век) и его русский перевод (XIX век) — общественное достояние. Атрибуция источнику размётки — azbyka.ru. |
 | `data/bible_embeddings.json`, `data/commentaries_embeddings.json` | OpenAI `text-embedding-3-small`, 512 измерений; порядок элементов = индексу в соответствующем основном файле | Производные векторы, не являются текстом — вопрос лицензии не применим. |
 
@@ -71,21 +84,18 @@ backend/
 
 ## Известные пробелы (не инвентаризация обещаний, а факты по состоянию репозитория)
 
-- **Код `function.js` отсутствует** — см. «Backend».
-- **Скрипт для `bible_embeddings.json` отсутствует** — см. «Backend».
-- **27 из 47 ссылок на стихи в `topics.js`** ведут на Послания и Деяния —
-  текстов этих книг в `data/bible.json` нет (там только 4 Евангелия).
-  Планируется взять полный текст Нового Завета из `uud-ai/kliros-app`
-  (`public/data/bible/*.json`) — формат там другой (по книгам, вложенность
-  `{глава: {стих: текст}}`), понадобится скрипт-конвертер. Это отдельная
-  задача (P1), в этом заходе не делалась.
-- Точность текста стихов в `topics.js` и `verses_of_day.js` против
-  синодального перевода не проверялась автоматически — отдельная задача (P1).
+- **Скрипт для `bible_embeddings.json` отсутствует**, а сам файл сейчас
+  устарел — см. «Backend».
+- Все 47 ссылок в `topics.js` и все 40 в `verses_of_day.js` автоматически
+  сверены с `data/bible.json` после загрузки полного НЗ — ссылки находятся.
+  Это проверка существования (книга/глава/стих есть в тексте), не сверка
+  слово-в-слово процитированного текста с оригиналом — последнее отдельная
+  задача.
 
 ## Пересборка данных
 
 ```bash
-npm run build:gospels                  # python scripts/get_all_gospels.py
+npm run build:nt                       # python scripts/get_nt.py
 npm run build:commentaries             # node scripts/build_commentaries.js — ходит на azbyka.ru, НЕ запускать без необходимости
 PROXY_API_KEY=xxx npm run build:commentaries-embeddings  # платный API, НЕ запускать без необходимости
 ```
