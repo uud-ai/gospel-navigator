@@ -2,7 +2,7 @@ import json
 import os
 
 def extract_gospels():
-    output_file = 'bible.json'
+    output_file = os.path.join(os.path.dirname(__file__), '..', 'data', 'bible.json')
     input_file = 'temp_bible/json/ru_synodal.json'
     
     if not os.path.exists('temp_bible'):

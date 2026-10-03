@@ -65,8 +65,8 @@ async function getEmbeddingsBatch(texts) {
 }
 
 async function main() {
-    const inputPath = path.join(process.cwd(), 'commentaries.json');
-    const outputPath = path.join(process.cwd(), 'commentaries_embeddings.json');
+    const inputPath = path.join(__dirname, '..', 'data', 'commentaries.json');
+    const outputPath = path.join(__dirname, '..', 'data', 'commentaries_embeddings.json');
 
     if (!fs.existsSync(inputPath)) {
         console.error(`Не найден ${inputPath}. Сначала запусти build_commentaries.js.`);

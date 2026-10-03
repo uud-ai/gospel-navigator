@@ -4,7 +4,7 @@
 // и собирает их в commentaries.json.
 //
 // Запуск:   node build_commentaries.js
-// Результат: commentaries.json в текущей директории.
+// Результат: ../data/commentaries.json.
 //
 // Источник: azbyka.ru/otechnik/Feofilakt_Bolgarskij/tolkovanie-na-evangelie-ot-{matfeja,marka,luki,ioanna}/{1..N}
 // Лицензия: тексты Феофилакта — общественное достояние (XI век), русский
@@ -217,7 +217,7 @@ async function main() {
         }
     }
 
-    const outPath = path.join(process.cwd(), 'commentaries.json');
+    const outPath = path.join(__dirname, '..', 'data', 'commentaries.json');
     fs.writeFileSync(outPath, JSON.stringify(allFragments), 'utf8');
 
     // Сводка по результату.
