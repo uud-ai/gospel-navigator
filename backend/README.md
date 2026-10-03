@@ -30,8 +30,22 @@
   `function.handler`), залить `function.js` + `package.json`;
 - задать переменные окружения из `.env.example`;
 - разместить `data/*.json` там, куда указывает `DATA_BASE_URL`, с публичным
-  доступом на чтение;
+  доступом на чтение (схема подтверждена автором — публичный бакет Yandex
+  Object Storage, без авторизации на чтение);
 - проверить вживую хотя бы один запрос из `index.html`.
+
+### Загрузка data/ в Yandex Object Storage
+
+Object Storage S3-совместим, подходит `aws` CLI с профилем на ключи
+сервисного аккаунта Yandex Cloud:
+
+```bash
+aws --endpoint-url=https://storage.yandexcloud.net \
+    s3 cp data/ s3://<bucket>/ --recursive --acl public-read
+```
+
+`DATA_BASE_URL` для функции в этом случае — `https://storage.yandexcloud.net/<bucket>`
+(без слэша на конце — так его использует `fetchJson()` в `function.js`).
 
 ## Сознательные упрощения (chisle-пометки в коде)
 
