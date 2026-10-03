@@ -2,5 +2,7 @@ node_modules/
 temp_bible/
 *.log
 .env
+.dev.vars
 .DS_Store
 __pycache__/
+.wrangler/

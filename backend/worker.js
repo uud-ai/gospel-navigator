@@ -1,9 +1,9 @@
 'use strict';
 
 /*
- * Благовест — облачная функция чата (Yandex Cloud Functions, Node.js 18+).
- * HTTP-триггер. Контракт запроса/ответа задан клиентом (index.html,
- * функция postChatRequest) — здесь он только реализован, не изменён.
+ * Благовест — облачная функция чата (Cloudflare Workers).
+ * Контракт запроса/ответа задан клиентом (index.html, функция
+ * postChatRequest) — здесь он только реализован, не изменён.
  *
  * Запрос:  POST, заголовки Content-Type: application/json, X-App-Token: <токен>.
  *   Тело: {
@@ -16,15 +16,13 @@
  * Ответ 400/403/429: { message: string } — клиент показывает это сообщение как есть.
  * Любая другая ошибка -> 500 с общим сообщением, подробности только в логах.
  *
- * Переменные окружения (задаются в консоли Yandex Cloud — НЕ в коде):
- *   APP_TOKEN      — должен совпадать с APP_TOKEN в index.html.
- *   PROXY_API_KEY  — ключ proxyapi.ru (OpenAI-совместимый прокси).
- *   CHAT_MODEL     — модель чата, по умолчанию 'gpt-4o-mini'.
- *   DATA_BASE_URL  — https-префикс публично читаемого хранения, откуда
- *                    берутся data/bible.json, data/commentaries.json и
- *                    соответствующие *_embeddings.json (например, Yandex
- *                    Object Storage с публичным доступом на чтение).
- *                    Пример: https://storage.yandexcloud.net/<bucket>
+ * Конфигурация (wrangler.toml / `wrangler secret put`, НЕ в коде):
+ *   APP_TOKEN      — секрет, должен совпадать с APP_TOKEN в index.html.
+ *   PROXY_API_KEY  — секрет, ключ proxyapi.ru (OpenAI-совместимый прокси).
+ *   CHAT_MODEL     — переменная, модель чата, по умолчанию 'gpt-4o-mini'.
+ *   DATA_BUCKET    — R2-биндинг с data/bible.json, data/commentaries.json
+ *                    и соответствующими *_embeddings.json (ключи в бакете —
+ *                    те же имена файлов, без префиксов).
  *
  * Параметры эмбеддингов (EMBEDDING_MODEL/EMBEDDING_DIMS) зафиксированы и
  * совпадают с scripts/build_commentaries_embeddings.js — менять нельзя,
@@ -34,7 +32,6 @@
 const PROXY_BASE_URL = 'https://api.proxyapi.ru/openai/v1';
 const EMBEDDING_MODEL = 'text-embedding-3-small';
 const EMBEDDING_DIMS = 512;
-const CHAT_MODEL = process.env.CHAT_MODEL || 'gpt-4o-mini';
 const CHAT_MAX_TOKENS = 700;
 
 const MAX_MESSAGES = 12;
@@ -43,9 +40,10 @@ const MAX_BODY_LENGTH = 20000;
 const TOP_K_VERSES = 5;
 const TOP_K_COMMENTARY = 3;
 
-// chisle: грубый rate limit в памяти процесса — переживает только warm-инстанс
-// одной функции, не распределённый. Если абьюз станет реальной проблемой,
-// нужен внешний стор (Redis/YDB), не память процесса.
+// chisle: грубый rate limit в памяти изолята — переживает только тёплый
+// изолят одного воркера, не распределённый между регионами/перезапусками.
+// Если абьюз станет реальной проблемой, нужен Durable Object или KV, не
+// память модуля.
 const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
 const RATE_LIMIT_MAX_REQUESTS = 20;
 const rateLimitState = new Map();
@@ -140,25 +138,15 @@ const CORS_HEADERS = {
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-function respond(statusCode, bodyObj) {
-    return {
-        statusCode,
+function respond(status, bodyObj) {
+    return new Response(JSON.stringify(bodyObj), {
+        status,
         headers: { ...CORS_HEADERS, 'Content-Type': 'application/json; charset=utf-8' },
-        body: JSON.stringify(bodyObj),
-        isBase64Encoded: false,
-    };
+    });
 }
 
-function getHeader(event, name) {
-    const headers = event.headers || {};
-    const key = Object.keys(headers).find((k) => k.toLowerCase() === name.toLowerCase());
-    return key ? headers[key] : undefined;
-}
-
-function getClientIp(event) {
-    const forwarded = getHeader(event, 'x-forwarded-for');
-    if (forwarded) return forwarded.split(',')[0].trim();
-    return (event.requestContext && event.requestContext.identity && event.requestContext.identity.sourceIp) || 'unknown';
+function getClientIp(request) {
+    return request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || 'unknown';
 }
 
 function checkRateLimit(ip) {
@@ -199,12 +187,12 @@ function sanitizeHistory(messages) {
     return messages.slice(-MAX_MESSAGES).map((m) => ({ role: m.role, content: m.content }));
 }
 
-async function embedText(text) {
+async function embedText(text, env) {
     const res = await fetch(`${PROXY_BASE_URL}/embeddings`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${process.env.PROXY_API_KEY}`,
+            Authorization: `Bearer ${env.PROXY_API_KEY}`,
         },
         body: JSON.stringify({ model: EMBEDDING_MODEL, input: text, dimensions: EMBEDDING_DIMS }),
     });
@@ -213,15 +201,15 @@ async function embedText(text) {
     return data.data[0].embedding;
 }
 
-async function callChatModel(messages) {
+async function callChatModel(messages, env) {
     const res = await fetch(`${PROXY_BASE_URL}/chat/completions`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${process.env.PROXY_API_KEY}`,
+            Authorization: `Bearer ${env.PROXY_API_KEY}`,
         },
         body: JSON.stringify({
-            model: CHAT_MODEL,
+            model: env.CHAT_MODEL || 'gpt-4o-mini',
             messages,
             max_tokens: CHAT_MAX_TOKENS,
             temperature: 0.4,
@@ -232,27 +220,25 @@ async function callChatModel(messages) {
     return data.choices[0].message.content;
 }
 
-// Кэш данных на весь срок жизни инстанса функции (warm start) — 70 МБ JSON
-// не пересчитывать и не перекачивать на каждый запрос. Параллельные холодные
-// запросы ждут один и тот же промис, а не плодят повторные закачки.
+// Кэш данных на весь срок жизни изолята (тёплые вызовы) — 70 МБ JSON не
+// перечитывать из R2 на каждый запрос. Параллельные холодные запросы ждут
+// один и тот же промис, а не плодят повторные чтения.
 let dataCachePromise = null;
 
-async function fetchJson(path) {
-    const base = process.env.DATA_BASE_URL;
-    if (!base) throw new Error('DATA_BASE_URL не задан.');
-    const res = await fetch(`${base}/${path}`);
-    if (!res.ok) throw new Error(`не удалось загрузить ${path}: ${res.status}`);
-    return res.json();
+async function readR2Json(bucket, key) {
+    const obj = await bucket.get(key);
+    if (!obj) throw new Error(`объект "${key}" не найден в R2-бакете`);
+    return obj.json();
 }
 
-async function loadData() {
+async function loadData(env) {
     if (!dataCachePromise) {
         dataCachePromise = (async () => {
             const [bible, bibleEmbeddings, commentaries, commentaryEmbeddings] = await Promise.all([
-                fetchJson('bible.json'),
-                fetchJson('bible_embeddings.json'),
-                fetchJson('commentaries.json'),
-                fetchJson('commentaries_embeddings.json'),
+                readR2Json(env.DATA_BUCKET, 'bible.json'),
+                readR2Json(env.DATA_BUCKET, 'bible_embeddings.json'),
+                readR2Json(env.DATA_BUCKET, 'commentaries.json'),
+                readR2Json(env.DATA_BUCKET, 'commentaries_embeddings.json'),
             ]);
             const verseSet = new Set(bible.map((v) => `${v.book}|${v.chapter}|${v.verse}`));
             return { bible, bibleEmbeddings, commentaries, commentaryEmbeddings, verseSet };
@@ -330,10 +316,10 @@ function findUnverifiedRefs(text, verseSet) {
     return unverified;
 }
 
-async function buildAnswer(payload) {
+async function buildAnswer(payload, env) {
     const lastUser = [...payload.messages].reverse().find((m) => m.role === 'user');
-    const queryEmbedding = await embedText(lastUser.content);
-    const data = await loadData();
+    const queryEmbedding = await embedText(lastUser.content, env);
+    const data = await loadData(env);
 
     const topVerses = topKIndices(queryEmbedding, data.bibleEmbeddings, TOP_K_VERSES).map((i) => data.bible[i]);
     const topCommentary = topKIndices(queryEmbedding, data.commentaryEmbeddings, TOP_K_COMMENTARY).map(
@@ -348,7 +334,7 @@ async function buildAnswer(payload) {
     if (topicNote) messages.push({ role: 'system', content: topicNote });
     messages.push(...sanitizeHistory(payload.messages));
 
-    const answer = await callChatModel(messages);
+    const answer = await callChatModel(messages, env);
 
     const unverified = findUnverifiedRefs(answer, data.verseSet);
     if (unverified.length > 0) {
@@ -358,44 +344,46 @@ async function buildAnswer(payload) {
     return answer;
 }
 
-exports.handler = async function (event) {
-    if (event.httpMethod === 'OPTIONS') {
-        return { statusCode: 204, headers: CORS_HEADERS, body: '', isBase64Encoded: false };
-    }
-    if (event.httpMethod !== 'POST') {
-        return respond(400, { message: 'Метод не поддерживается.' });
-    }
+export default {
+    async fetch(request, env) {
+        if (request.method === 'OPTIONS') {
+            return new Response(null, { status: 204, headers: CORS_HEADERS });
+        }
+        if (request.method !== 'POST') {
+            return respond(400, { message: 'Метод не поддерживается.' });
+        }
 
-    const token = getHeader(event, 'X-App-Token');
-    if (!process.env.APP_TOKEN || token !== process.env.APP_TOKEN) {
-        return respond(403, { message: 'Доступ запрещён.' });
-    }
+        const token = request.headers.get('X-App-Token');
+        if (!env.APP_TOKEN || token !== env.APP_TOKEN) {
+            return respond(403, { message: 'Доступ запрещён.' });
+        }
 
-    const ip = getClientIp(event);
-    if (!checkRateLimit(ip)) {
-        return respond(429, { message: 'Слишком много запросов. Подождите немного и попробуйте снова.' });
-    }
+        const ip = getClientIp(request);
+        if (!checkRateLimit(ip)) {
+            return respond(429, { message: 'Слишком много запросов. Подождите немного и попробуйте снова.' });
+        }
 
-    const rawBody = event.isBase64Encoded ? Buffer.from(event.body || '', 'base64').toString('utf8') : event.body || '';
-    if (rawBody.length > MAX_BODY_LENGTH) {
-        return respond(400, { message: 'Запрос слишком большой.' });
-    }
+        const rawBody = await request.text();
+        if (rawBody.length > MAX_BODY_LENGTH) {
+            return respond(400, { message: 'Запрос слишком большой.' });
+        }
 
-    let payload;
-    try {
-        payload = JSON.parse(rawBody);
-    } catch {
-        return respond(400, { message: 'Некорректный JSON.' });
-    }
+        let payload;
+        try {
+            payload = JSON.parse(rawBody);
+        } catch {
+            return respond(400, { message: 'Некорректный JSON.' });
+        }
 
-    const validationError = validatePayload(payload);
-    if (validationError) return respond(400, { message: validationError });
+        const validationError = validatePayload(payload);
+        if (validationError) return respond(400, { message: validationError });
 
-    try {
-        const message = await buildAnswer(payload);
-        return respond(200, { message });
-    } catch (err) {
-        console.error('Ошибка обработки запроса:', err);
-        return respond(500, { message: 'Внутренняя ошибка сервера. Попробуйте позже.' });
-    }
+        try {
+            const message = await buildAnswer(payload, env);
+            return respond(200, { message });
+        } catch (err) {
+            console.error('Ошибка обработки запроса:', err);
+            return respond(500, { message: 'Внутренняя ошибка сервера. Попробуйте позже.' });
+        }
+    },
 };
