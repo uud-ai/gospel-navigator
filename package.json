@@ -10,6 +10,7 @@
   "scripts": {
     "build:nt": "python scripts/get_nt.py",
     "build:commentaries": "node scripts/build_commentaries.js",
-    "build:commentaries-embeddings": "node scripts/build_commentaries_embeddings.js"
+    "build:commentaries-embeddings": "node scripts/build_commentaries_embeddings.js",
+    "build:bible-embeddings": "node scripts/build_bible_embeddings.js"
   }
 }
