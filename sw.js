@@ -22,7 +22,7 @@
 //
 // При выпуске новой версии index.html/topics.js/verses_of_day.js —
 // поменяй CACHE_NAME, иначе старый кэш переживёт деплой.
-const CACHE_NAME = 'blagovest-v1';
+const CACHE_NAME = 'blagovest-v2';
 const APP_SHELL = ['./', './index.html', './topics.js', './verses_of_day.js'];
 
 self.addEventListener('install', (event) => {
