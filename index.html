@@ -1562,9 +1562,19 @@
     const supportsSpotlight = window.matchMedia('(pointer: fine)').matches
         && window.matchMedia('(prefers-reduced-motion: no-preference)').matches;
     if (supportsSpotlight) {
+        // rAF-throttle: быстрое движение мыши даёт десятки mousemove между
+        // кадрами — пишем стиль максимум раз на кадр (с последними координатами),
+        // а не на каждое событие.
+        let spotlightX = 0, spotlightY = 0, spotlightFrame = null;
         document.addEventListener('mousemove', e => {
-            document.body.style.setProperty('--spot-x', e.clientX + 'px');
-            document.body.style.setProperty('--spot-y', e.clientY + 'px');
+            spotlightX = e.clientX;
+            spotlightY = e.clientY;
+            if (spotlightFrame !== null) return;
+            spotlightFrame = requestAnimationFrame(() => {
+                document.body.style.setProperty('--spot-x', spotlightX + 'px');
+                document.body.style.setProperty('--spot-y', spotlightY + 'px');
+                spotlightFrame = null;
+            });
         }, { passive: true });
     }
 

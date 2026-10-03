@@ -233,9 +233,10 @@ async function callChatModel(messages, env) {
     return data.choices[0].message.content;
 }
 
-// Кэш данных на весь срок жизни изолята (тёплые вызовы) — 70 МБ JSON не
-// перекачивать на каждый запрос. Параллельные холодные запросы ждут один
-// и тот же промис, а не плодят повторные закачки.
+// Кэш данных на весь срок жизни изолята (тёплые вызовы) — бинарники эмбеддингов
+// (~24 МБ суммарно) не перекачивать и не парсить на каждый запрос, а нормы
+// векторов (см. computeNorms) не пересчитывать на каждый поиск. Параллельные
+// холодные запросы ждут один и тот же промис, а не плодят повторные закачки.
 let dataCachePromise = null;
 
 const DEFAULT_DATA_BASE_URL = 'https://raw.githubusercontent.com/uud-ai/gospel-navigator/main/data';
@@ -246,18 +247,51 @@ async function fetchJson(baseUrl, filename) {
     return res.json();
 }
 
+// Эмбеддинги хранятся в .bin — сырые float32 подряд (dims на вектор), без
+// JSON-обёртки: тот же массив чисел в виде текста ("0.0494384765625, ...")
+// весит ~4.6x больше и после JSON.parse разворачивается в JS-массив массивов
+// с боксингом каждого double — для bible_embeddings это ~75 МБ текста против
+// ~16 МБ бинарника. Формат пишут scripts/build_bible_embeddings.js и
+// scripts/build_commentaries_embeddings.js — менять расширение/порядок байт
+// в одном месте без другого нельзя.
+async function fetchFloat32(baseUrl, filename) {
+    const res = await fetch(`${baseUrl}/${filename}`);
+    if (!res.ok) throw new Error(`не удалось загрузить ${filename}: ${res.status}`);
+    return new Float32Array(await res.arrayBuffer());
+}
+
+// Нормы векторов не зависят от запроса — считаем раз на изолят при загрузке,
+// а не на каждый поиск (раньше topKIndices пересчитывал норму каждого из
+// ~11700 кандидатов на КАЖДЫЙ запрос).
+function computeNorms(flat, dims) {
+    const count = flat.length / dims;
+    const norms = new Float32Array(count);
+    for (let i = 0; i < count; i++) {
+        const base = i * dims;
+        let sumSq = 0;
+        for (let d = 0; d < dims; d++) {
+            const v = flat[base + d];
+            sumSq += v * v;
+        }
+        norms[i] = Math.sqrt(sumSq);
+    }
+    return norms;
+}
+
 async function loadData(env) {
     if (!dataCachePromise) {
         const baseUrl = env.DATA_BASE_URL || DEFAULT_DATA_BASE_URL;
         dataCachePromise = (async () => {
             const [bible, bibleEmbeddings, commentaries, commentaryEmbeddings] = await Promise.all([
                 fetchJson(baseUrl, 'bible.json'),
-                fetchJson(baseUrl, 'bible_embeddings.json'),
+                fetchFloat32(baseUrl, 'bible_embeddings.bin'),
                 fetchJson(baseUrl, 'commentaries.json'),
-                fetchJson(baseUrl, 'commentaries_embeddings.json'),
+                fetchFloat32(baseUrl, 'commentaries_embeddings.bin'),
             ]);
             const verseSet = new Set(bible.map((v) => `${v.book}|${v.chapter}|${v.verse}`));
-            return { bible, bibleEmbeddings, commentaries, commentaryEmbeddings, verseSet };
+            const bibleNorms = computeNorms(bibleEmbeddings, EMBEDDING_DIMS);
+            const commentaryNorms = computeNorms(commentaryEmbeddings, EMBEDDING_DIMS);
+            return { bible, bibleEmbeddings, bibleNorms, commentaries, commentaryEmbeddings, commentaryNorms, verseSet };
         })().catch((err) => {
             dataCachePromise = null; // не кэшируем провал — следующий запрос попробует снова
             throw err;
@@ -266,18 +300,25 @@ async function loadData(env) {
     return dataCachePromise;
 }
 
-function cosineSimilarity(a, b) {
-    let dot = 0, normA = 0, normB = 0;
-    for (let i = 0; i < a.length; i++) {
-        dot += a[i] * b[i];
-        normA += a[i] * a[i];
-        normB += b[i] * b[i];
-    }
-    return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+function vectorNorm(vec) {
+    let sumSq = 0;
+    for (let i = 0; i < vec.length; i++) sumSq += vec[i] * vec[i];
+    return Math.sqrt(sumSq);
 }
 
-function topKIndices(queryVec, embeddings, k) {
-    const scored = embeddings.map((vec, i) => ({ i, score: cosineSimilarity(queryVec, vec) }));
+// flat — все векторы корпуса подряд (dims чисел на вектор), norms — их
+// предрасчитанные нормы (computeNorms, один раз на изолят). queryNorm считает
+// вызывающая сторона один раз на запрос, а не этот перебор — на запрос
+// одна и та же норма нужна ~11700 раз (по числу векторов в корпусе).
+function topKIndices(queryVec, queryNorm, flat, norms, dims, k) {
+    const count = norms.length;
+    const scored = new Array(count);
+    for (let i = 0; i < count; i++) {
+        const base = i * dims;
+        let dot = 0;
+        for (let d = 0; d < dims; d++) dot += queryVec[d] * flat[base + d];
+        scored[i] = { i, score: dot / (queryNorm * norms[i]) };
+    }
     scored.sort((a, b) => b.score - a.score);
     return scored.slice(0, k).filter((s) => s.score >= MIN_SIMILARITY).map((s) => s.i);
 }
@@ -336,11 +377,12 @@ async function buildAnswer(payload, env) {
     const lastUser = [...payload.messages].reverse().find((m) => m.role === 'user');
     const queryEmbedding = await embedText(lastUser.content, env);
     const data = await loadData(env);
+    const queryNorm = vectorNorm(queryEmbedding);
 
-    const topVerses = topKIndices(queryEmbedding, data.bibleEmbeddings, TOP_K_VERSES).map((i) => data.bible[i]);
-    const topCommentary = topKIndices(queryEmbedding, data.commentaryEmbeddings, TOP_K_COMMENTARY).map(
-        (i) => data.commentaries[i]
-    );
+    const topVerses = topKIndices(queryEmbedding, queryNorm, data.bibleEmbeddings, data.bibleNorms, EMBEDDING_DIMS, TOP_K_VERSES)
+        .map((i) => data.bible[i]);
+    const topCommentary = topKIndices(queryEmbedding, queryNorm, data.commentaryEmbeddings, data.commentaryNorms, EMBEDDING_DIMS, TOP_K_COMMENTARY)
+        .map((i) => data.commentaries[i]);
 
     const messages = [
         { role: 'system', content: SYSTEM_PROMPT },
