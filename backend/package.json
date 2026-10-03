@@ -1,0 +1,11 @@
+{
+  "name": "gospel-navigator-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Облачная функция чата для Благовеста (Yandex Cloud Functions)",
+  "main": "function.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {}
+}
