@@ -851,6 +851,23 @@
     const tg = window.Telegram?.WebApp;
     const isInTelegram = tg && tg.initData && tg.initData.length > 0;
 
+    // Если приложение открыли переходом с другой страницы того же сайта
+    // (напр. teaser-секция на главной nikolskiyhram.site, когда «Благовест»
+    // встроен туда подпапкой /blagovest/) — document.referrer это покажет.
+    // Домен нигде не хардкодим: сработает для любого сайта, который когда-
+    // нибудь ещё так же встроит приложение, и корректно ничего не покажет
+    // при прямом заходе (bookmark, Telegram, QR-код). Внутри Telegram не
+    // нужно — там выход из Mini App свой.
+    let parentSiteUrl = null;
+    if (!isInTelegram && document.referrer) {
+        try {
+            const ref = new URL(document.referrer);
+            if (ref.origin === location.origin && ref.href !== location.href) {
+                parentSiteUrl = ref.href;
+            }
+        } catch (e) { /* некорректный referrer — просто не показываем кнопку */ }
+    }
+
     // Применяем тему (светлая/тёмная) на основе того, что говорит Telegram.
     // Вне Telegram — всегда светлая (сохраняем исходный дизайн).
     function applyTheme() {
@@ -1056,14 +1073,26 @@
         const headerTitle = document.getElementById('headerTitle');
 
         if (name === 'home') {
-            backBtn.classList.remove('visible');
+            // На главном экране внутри приложения возвращаться некуда — но
+            // если мы сюда попали переходом с родительского сайта, та же
+            // стрелка «‹» ведёт обратно туда (см. parentSiteUrl выше и
+            // обработчик клика ниже).
+            if (parentSiteUrl) {
+                backBtn.classList.add('visible');
+                backBtn.setAttribute('aria-label', 'Назад на сайт');
+            } else {
+                backBtn.classList.remove('visible');
+                backBtn.setAttribute('aria-label', 'Назад');
+            }
             headerTitle.textContent = 'Благовест';
             currentTopic = null;
         } else if (name === 'topic') {
             backBtn.classList.add('visible');
+            backBtn.setAttribute('aria-label', 'Назад');
             headerTitle.textContent = currentTopic ? currentTopic.title : 'Тема';
         } else if (name === 'chat') {
             backBtn.classList.add('visible');
+            backBtn.setAttribute('aria-label', 'Назад');
             // При длинной переписке начальный «бейдж» контекста уплывает наверх
             // вместе со скроллом — а шапка остаётся видна всегда. Поэтому дублируем
             // в неё короткий маркер того, о чём идёт разговор. Источник истины —
@@ -1498,7 +1527,14 @@
     // ============================================================
     // СЛУШАТЕЛИ СОБЫТИЙ
     // ============================================================
-    document.getElementById('backBtn').addEventListener('click', () => { haptic.light(); goBack(); });
+    document.getElementById('backBtn').addEventListener('click', () => {
+        haptic.light();
+        if (currentScreen === 'home' && parentSiteUrl) {
+            location.href = parentSiteUrl;
+            return;
+        }
+        goBack();
+    });
     document.getElementById('clearBtn').addEventListener('click', () => { haptic.light(); clearHistory(); });
     document.getElementById('freeChatCard').addEventListener('click', () => { haptic.selection(); openChat(null); });
     document.getElementById('freeChatCard').addEventListener('keydown', e => {
