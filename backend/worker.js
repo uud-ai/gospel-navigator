@@ -195,7 +195,7 @@ async function embedText(text, env) {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${env.PROXY_API_KEY}`,
         },
-        body: JSON.stringify({ model: EMBEDDING_MODEL, input: text, dimensions: EMBEDDING_DIMS }),
+        body: JSON.stringify({ model: EMBEDDING_MODEL, input: [text], dimensions: EMBEDDING_DIMS }),
     });
     if (!res.ok) throw new Error(`embeddings API ${res.status}: ${(await res.text()).slice(0, 200)}`);
     const data = await res.json();
