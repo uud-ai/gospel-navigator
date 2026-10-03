@@ -20,9 +20,10 @@
  *   APP_TOKEN      — секрет, должен совпадать с APP_TOKEN в index.html.
  *   PROXY_API_KEY  — секрет, ключ proxyapi.ru (OpenAI-совместимый прокси).
  *   CHAT_MODEL     — переменная, модель чата, по умолчанию 'gpt-4o-mini'.
- *   DATA_BUCKET    — R2-биндинг с data/bible.json, data/commentaries.json
- *                    и соответствующими *_embeddings.json (ключи в бакете —
- *                    те же имена файлов, без префиксов).
+ *   DATA_BASE_URL  — переменная, https-префикс, откуда читаются
+ *                    data/bible.json, data/commentaries.json и
+ *                    *_embeddings.json. По умолчанию — raw.githubusercontent.com
+ *                    на этот же репозиторий (данные публичны, R2 не нужен).
  *
  * Параметры эмбеддингов (EMBEDDING_MODEL/EMBEDDING_DIMS) зафиксированы и
  * совпадают с scripts/build_commentaries_embeddings.js — менять нельзя,
@@ -221,24 +222,27 @@ async function callChatModel(messages, env) {
 }
 
 // Кэш данных на весь срок жизни изолята (тёплые вызовы) — 70 МБ JSON не
-// перечитывать из R2 на каждый запрос. Параллельные холодные запросы ждут
-// один и тот же промис, а не плодят повторные чтения.
+// перекачивать на каждый запрос. Параллельные холодные запросы ждут один
+// и тот же промис, а не плодят повторные закачки.
 let dataCachePromise = null;
 
-async function readR2Json(bucket, key) {
-    const obj = await bucket.get(key);
-    if (!obj) throw new Error(`объект "${key}" не найден в R2-бакете`);
-    return obj.json();
+const DEFAULT_DATA_BASE_URL = 'https://raw.githubusercontent.com/uud-ai/gospel-navigator/main/data';
+
+async function fetchJson(baseUrl, filename) {
+    const res = await fetch(`${baseUrl}/${filename}`);
+    if (!res.ok) throw new Error(`не удалось загрузить ${filename}: ${res.status}`);
+    return res.json();
 }
 
 async function loadData(env) {
     if (!dataCachePromise) {
+        const baseUrl = env.DATA_BASE_URL || DEFAULT_DATA_BASE_URL;
         dataCachePromise = (async () => {
             const [bible, bibleEmbeddings, commentaries, commentaryEmbeddings] = await Promise.all([
-                readR2Json(env.DATA_BUCKET, 'bible.json'),
-                readR2Json(env.DATA_BUCKET, 'bible_embeddings.json'),
-                readR2Json(env.DATA_BUCKET, 'commentaries.json'),
-                readR2Json(env.DATA_BUCKET, 'commentaries_embeddings.json'),
+                fetchJson(baseUrl, 'bible.json'),
+                fetchJson(baseUrl, 'bible_embeddings.json'),
+                fetchJson(baseUrl, 'commentaries.json'),
+                fetchJson(baseUrl, 'commentaries_embeddings.json'),
             ]);
             const verseSet = new Set(bible.map((v) => `${v.book}|${v.chapter}|${v.verse}`));
             return { bible, bibleEmbeddings, commentaries, commentaryEmbeddings, verseSet };

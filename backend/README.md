@@ -2,7 +2,7 @@
 
 Облачная функция чата для «Благовеста». Написана с нуля (исходник, на
 который ссылались сборочные скрипты, был утерян и не восстанавливается —
-см. историю в корневом README). Платформа — Cloudflare Workers + R2
+см. историю в корневом README). Платформа — Cloudflare Workers
 (изначально пробовали Yandex Cloud Functions, но аккаунт оказался
 заблокирован по биллингу, а `yc` CLI не мог даже проверить это — см.
 git-историю).
@@ -37,15 +37,12 @@ git-историю).
    npm install -g wrangler
    wrangler login
    ```
-2. Создать R2-бакет и залить туда `data/*.json`:
-   ```bash
-   wrangler r2 bucket create blagovest-data
-   wrangler r2 object put blagovest-data/bible.json --file=../data/bible.json
-   wrangler r2 object put blagovest-data/commentaries.json --file=../data/commentaries.json
-   wrangler r2 object put blagovest-data/bible_embeddings.json --file=../data/bible_embeddings.json
-   wrangler r2 object put blagovest-data/commentaries_embeddings.json --file=../data/commentaries_embeddings.json
-   ```
-   Имя бакета в `wrangler.toml` (`bucket_name`) должно совпадать.
+2. Данные читаются прямо с `raw.githubusercontent.com` на этот же
+   публичный репозиторий (`DATA_BASE_URL` в `wrangler.toml`) — R2 не
+   используется (пробовали — Cloudflare просит привязать карту даже для
+   бесплатного тарифа, решили не заводить лишнюю зависимость). Ничего
+   заливать отдельно не нужно: обновление данных в `data/` через обычный
+   коммит в `main` сразу видно воркеру (с учётом кэша на тёплый изолят).
 3. Задать секреты (не попадают в git, задаются по одному в интерактивном
    запросе):
    ```bash
