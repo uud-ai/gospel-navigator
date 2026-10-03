@@ -197,7 +197,11 @@ async function embedText(text, env) {
         },
         body: JSON.stringify({ model: EMBEDDING_MODEL, input: [text], dimensions: EMBEDDING_DIMS }),
     });
-    if (!res.ok) throw new Error(`embeddings API ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    if (!res.ok) {
+        const bodyText = await res.text();
+        const ct = res.headers.get('content-type');
+        throw new Error(`embeddings API ${res.status} ${res.statusText} ct=${ct} len=${bodyText.length}: ${bodyText.slice(0, 300)}`);
+    }
     const data = await res.json();
     return data.data[0].embedding;
 }
