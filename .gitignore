@@ -1,0 +1,5 @@
+node_modules/
+temp_bible/
+*.log
+.env
+.DS_Store
