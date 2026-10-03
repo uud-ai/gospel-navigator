@@ -3,3 +3,4 @@ temp_bible/
 *.log
 .env
 .DS_Store
+__pycache__/
