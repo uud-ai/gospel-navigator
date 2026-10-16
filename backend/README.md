@@ -107,16 +107,13 @@ yc serverless api-gateway create --name blagovest-gateway --spec apigw.yaml \
 
 Без облака — через фейковый `event`:
 ```bash
-cp .env.example .env   # заполнить реальными значениями, не коммитить
-export $(grep -v '^#' .env | xargs)   # или вручную export APP_TOKEN=... и т.д.
-node -e "
-require('./index.js').handler({
-  httpMethod: 'POST',
-  headers: { Origin: 'https://nikolskiyhram.site', 'X-App-Token': process.env.APP_TOKEN },
-  body: JSON.stringify({ messages: [{ role: 'user', content: 'Что значит притча о блудном сыне?' }], source: 'free_chat' }),
-}).then((r) => console.log(r.statusCode, r.body));
-"
+cp .env.example .env   # заполнить реальными значениями через текстовый редактор, не коммитить
+node local-test.js
 ```
+`local-test.js` сам читает `.env` и вызывает `handler()` с тестовым
+сообщением. Значения в `.env` лучше вставлять через редактор (Notepad),
+а не печатать в PowerShell — на некоторых машинах автодополнение
+PSReadLine глотает заглавные латинские буквы при вводе `$env:NAME=...`.
 
 ## Сознательные упрощения (chisle-пометки в коде)
 
