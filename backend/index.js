@@ -1,7 +1,7 @@
 'use strict';
 
 /*
- * Благовест — облачная функция чата (Cloudflare Workers).
+ * Благовест — облачная функция чата (Yandex Cloud Functions).
  * Контракт запроса/ответа задан клиентом (index.html, функция
  * postChatRequest) — здесь он только реализован, не изменён.
  *
@@ -16,14 +16,17 @@
  * Ответ 400/403/429: { message: string } — клиент показывает это сообщение как есть.
  * Любая другая ошибка -> 500 с общим сообщением, подробности только в логах.
  *
- * Конфигурация (wrangler.toml / `wrangler secret put`, НЕ в коде):
- *   APP_TOKEN      — секрет, должен совпадать с APP_TOKEN в index.html.
- *   PROXY_API_KEY  — секрет, ключ proxyapi.ru (OpenAI-совместимый прокси).
- *   CHAT_MODEL     — переменная, модель чата, по умолчанию 'gpt-4o-mini'.
- *   DATA_BASE_URL  — переменная, https-префикс, откуда читаются
- *                    data/bible.json, data/commentaries.json и
- *                    *_embeddings.json. По умолчанию — raw.githubusercontent.com
- *                    на этот же репозиторий (данные публичны, R2 не нужен).
+ * Конфигурация — переменные окружения функции (`yc serverless function
+ * version create --environment ...` / секреты через `--secret`), НЕ в коде:
+ *   APP_TOKEN        — секрет, должен совпадать с APP_TOKEN в index.html.
+ *   PROXY_API_KEY    — секрет, ключ proxyapi.ru (OpenAI-совместимый прокси).
+ *   CHAT_MODEL       — переменная, модель чата, по умолчанию 'gpt-4o-mini'.
+ *   DATA_BASE_URL    — переменная, https-префикс, откуда читаются
+ *                       data/bible.json, data/commentaries.json и
+ *                       *_embeddings.json. По умолчанию — raw.githubusercontent.com
+ *                       на этот же репозиторий (данные публичны).
+ *   ALLOWED_ORIGINS  — переменная, список разрешённых Origin через запятую.
+ *                       По умолчанию 'https://nikolskiyhram.site'.
  *
  * Параметры эмбеддингов (EMBEDDING_MODEL/EMBEDDING_DIMS) зафиксированы и
  * совпадают с scripts/build_commentaries_embeddings.js — менять нельзя,
@@ -49,10 +52,11 @@ const TOP_K_COMMENTARY = 5;
 // по общим знаниям вместо того, чтобы путаться в нерелевантных цитатах.
 const MIN_SIMILARITY = 0.35;
 
-// chisle: грубый rate limit в памяти изолята — переживает только тёплый
-// изолят одного воркера, не распределённый между регионами/перезапусками.
-// Если абьюз станет реальной проблемой, нужен Durable Object или KV, не
-// память модуля.
+const DEFAULT_ALLOWED_ORIGINS = ['https://nikolskiyhram.site'];
+
+// chisle: грубый rate limit в памяти инстанса — переживает только тёплый
+// инстанс, не распределённый между репликами/перезапусками. Если абьюз
+// станет реальной проблемой, нужен внешний стейт (Redis/YDB), не память модуля.
 const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
 const RATE_LIMIT_MAX_REQUESTS = 20;
 const rateLimitState = new Map();
@@ -141,21 +145,42 @@ const REF_TOKEN_TO_BOOK = {
     'Откр': 'Откровение', 'Откровение': 'Откровение',
 };
 
-const CORS_HEADERS = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type, X-App-Token',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
-
-function respond(status, bodyObj) {
-    return new Response(JSON.stringify(bodyObj), {
-        status,
-        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json; charset=utf-8' },
-    });
+function getHeader(event, name) {
+    const headers = event.headers || {};
+    const lower = name.toLowerCase();
+    for (const key of Object.keys(headers)) {
+        if (key.toLowerCase() === lower) return headers[key];
+    }
+    return undefined;
 }
 
-function getClientIp(request) {
-    return request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || 'unknown';
+function getAllowedOrigins() {
+    const raw = process.env.ALLOWED_ORIGINS;
+    if (!raw) return DEFAULT_ALLOWED_ORIGINS;
+    return raw.split(',').map((s) => s.trim()).filter(Boolean);
+}
+
+function corsHeaders(origin) {
+    const headers = {
+        'Access-Control-Allow-Headers': 'Content-Type, X-App-Token',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        Vary: 'Origin',
+    };
+    if (origin) headers['Access-Control-Allow-Origin'] = origin;
+    return headers;
+}
+
+function respond(status, bodyObj, origin) {
+    return {
+        statusCode: status,
+        headers: { ...corsHeaders(origin), 'Content-Type': 'application/json; charset=utf-8' },
+        body: JSON.stringify(bodyObj),
+    };
+}
+
+function getClientIp(event) {
+    const sourceIp = event.requestContext && event.requestContext.identity && event.requestContext.identity.sourceIp;
+    return sourceIp || getHeader(event, 'X-Forwarded-For') || 'unknown';
 }
 
 function checkRateLimit(ip) {
@@ -196,12 +221,12 @@ function sanitizeHistory(messages) {
     return messages.slice(-MAX_MESSAGES).map((m) => ({ role: m.role, content: m.content }));
 }
 
-async function embedText(text, env) {
+async function embedText(text) {
     const res = await fetch(`${PROXY_BASE_URL}/embeddings`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${env.PROXY_API_KEY}`,
+            Authorization: `Bearer ${process.env.PROXY_API_KEY}`,
         },
         body: JSON.stringify({ model: EMBEDDING_MODEL, input: [text], dimensions: EMBEDDING_DIMS }),
     });
@@ -214,15 +239,15 @@ async function embedText(text, env) {
     return data.data[0].embedding;
 }
 
-async function callChatModel(messages, env) {
+async function callChatModel(messages) {
     const res = await fetch(`${PROXY_BASE_URL}/chat/completions`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${env.PROXY_API_KEY}`,
+            Authorization: `Bearer ${process.env.PROXY_API_KEY}`,
         },
         body: JSON.stringify({
-            model: env.CHAT_MODEL || 'gpt-4o-mini',
+            model: process.env.CHAT_MODEL || 'gpt-4o-mini',
             messages,
             max_tokens: CHAT_MAX_TOKENS,
             temperature: 0.4,
@@ -233,7 +258,7 @@ async function callChatModel(messages, env) {
     return data.choices[0].message.content;
 }
 
-// Кэш данных на весь срок жизни изолята (тёплые вызовы) — бинарники эмбеддингов
+// Кэш данных на весь срок жизни инстанса (тёплые вызовы) — бинарники эмбеддингов
 // (~24 МБ суммарно) не перекачивать и не парсить на каждый запрос, а нормы
 // векторов (см. computeNorms) не пересчитывать на каждый поиск. Параллельные
 // холодные запросы ждут один и тот же промис, а не плодят повторные закачки.
@@ -260,7 +285,7 @@ async function fetchFloat32(baseUrl, filename) {
     return new Float32Array(await res.arrayBuffer());
 }
 
-// Нормы векторов не зависят от запроса — считаем раз на изолят при загрузке,
+// Нормы векторов не зависят от запроса — считаем раз на инстанс при загрузке,
 // а не на каждый поиск (раньше topKIndices пересчитывал норму каждого из
 // ~11700 кандидатов на КАЖДЫЙ запрос).
 function computeNorms(flat, dims) {
@@ -278,9 +303,9 @@ function computeNorms(flat, dims) {
     return norms;
 }
 
-async function loadData(env) {
+async function loadData() {
     if (!dataCachePromise) {
-        const baseUrl = env.DATA_BASE_URL || DEFAULT_DATA_BASE_URL;
+        const baseUrl = process.env.DATA_BASE_URL || DEFAULT_DATA_BASE_URL;
         dataCachePromise = (async () => {
             const [bible, bibleEmbeddings, commentaries, commentaryEmbeddings] = await Promise.all([
                 fetchJson(baseUrl, 'bible.json'),
@@ -307,7 +332,7 @@ function vectorNorm(vec) {
 }
 
 // flat — все векторы корпуса подряд (dims чисел на вектор), norms — их
-// предрасчитанные нормы (computeNorms, один раз на изолят). queryNorm считает
+// предрасчитанные нормы (computeNorms, один раз на инстанс). queryNorm считает
 // вызывающая сторона один раз на запрос, а не этот перебор — на запрос
 // одна и та же норма нужна ~11700 раз (по числу векторов в корпусе).
 function topKIndices(queryVec, queryNorm, flat, norms, dims, k) {
@@ -373,10 +398,10 @@ function findUnverifiedRefs(text, verseSet) {
     return unverified;
 }
 
-async function buildAnswer(payload, env) {
+async function buildAnswer(payload) {
     const lastUser = [...payload.messages].reverse().find((m) => m.role === 'user');
-    const queryEmbedding = await embedText(lastUser.content, env);
-    const data = await loadData(env);
+    const queryEmbedding = await embedText(lastUser.content);
+    const data = await loadData();
     const queryNorm = vectorNorm(queryEmbedding);
 
     const topVerses = topKIndices(queryEmbedding, queryNorm, data.bibleEmbeddings, data.bibleNorms, EMBEDDING_DIMS, TOP_K_VERSES)
@@ -392,7 +417,7 @@ async function buildAnswer(payload, env) {
     if (topicNote) messages.push({ role: 'system', content: topicNote });
     messages.push(...sanitizeHistory(payload.messages));
 
-    const answer = await callChatModel(messages, env);
+    const answer = await callChatModel(messages);
 
     const unverified = findUnverifiedRefs(answer, data.verseSet);
     if (unverified.length > 0) {
@@ -402,46 +427,56 @@ async function buildAnswer(payload, env) {
     return answer;
 }
 
-export default {
-    async fetch(request, env) {
-        if (request.method === 'OPTIONS') {
-            return new Response(null, { status: 204, headers: CORS_HEADERS });
-        }
-        if (request.method !== 'POST') {
-            return respond(400, { message: 'Метод не поддерживается.' });
-        }
+exports.handler = async function (event) {
+    const origin = getHeader(event, 'Origin');
+    const allowedOrigins = getAllowedOrigins();
+    const originOk = !!origin && allowedOrigins.includes(origin);
+    const echoOrigin = originOk ? origin : undefined;
 
-        const token = request.headers.get('X-App-Token');
-        if (!env.APP_TOKEN || token !== env.APP_TOKEN) {
-            return respond(403, { message: 'Доступ запрещён.' });
-        }
+    const method = event.httpMethod;
 
-        const ip = getClientIp(request);
-        if (!checkRateLimit(ip)) {
-            return respond(429, { message: 'Слишком много запросов. Подождите немного и попробуйте снова.' });
-        }
+    if (method === 'OPTIONS') {
+        return { statusCode: 204, headers: corsHeaders(echoOrigin), body: '' };
+    }
+    if (method !== 'POST') {
+        return respond(400, { message: 'Метод не поддерживается.' }, echoOrigin);
+    }
+    if (!originOk) {
+        return respond(403, { message: 'Доступ запрещён.' }, undefined);
+    }
 
-        const rawBody = await request.text();
-        if (rawBody.length > MAX_BODY_LENGTH) {
-            return respond(400, { message: 'Запрос слишком большой.' });
-        }
+    const token = getHeader(event, 'X-App-Token');
+    if (!process.env.APP_TOKEN || token !== process.env.APP_TOKEN) {
+        return respond(403, { message: 'Доступ запрещён.' }, echoOrigin);
+    }
 
-        let payload;
-        try {
-            payload = JSON.parse(rawBody);
-        } catch {
-            return respond(400, { message: 'Некорректный JSON.' });
-        }
+    const ip = getClientIp(event);
+    if (!checkRateLimit(ip)) {
+        return respond(429, { message: 'Слишком много запросов. Подождите немного и попробуйте снова.' }, echoOrigin);
+    }
 
-        const validationError = validatePayload(payload);
-        if (validationError) return respond(400, { message: validationError });
+    const rawBody = event.isBase64Encoded
+        ? Buffer.from(event.body || '', 'base64').toString('utf-8')
+        : (event.body || '');
+    if (rawBody.length > MAX_BODY_LENGTH) {
+        return respond(400, { message: 'Запрос слишком большой.' }, echoOrigin);
+    }
 
-        try {
-            const message = await buildAnswer(payload, env);
-            return respond(200, { message });
-        } catch (err) {
-            console.error('Ошибка обработки запроса:', err);
-            return respond(500, { message: 'Внутренняя ошибка сервера. Попробуйте позже.' });
-        }
-    },
+    let payload;
+    try {
+        payload = JSON.parse(rawBody);
+    } catch {
+        return respond(400, { message: 'Некорректный JSON.' }, echoOrigin);
+    }
+
+    const validationError = validatePayload(payload);
+    if (validationError) return respond(400, { message: validationError }, echoOrigin);
+
+    try {
+        const message = await buildAnswer(payload);
+        return respond(200, { message }, echoOrigin);
+    } catch (err) {
+        console.error('Ошибка обработки запроса:', err);
+        return respond(500, { message: 'Внутренняя ошибка сервера. Попробуйте позже.' }, echoOrigin);
+    }
 };

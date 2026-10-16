@@ -1,14 +1,7 @@
 {
   "name": "gospel-navigator-backend",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Облачная функция чата для Благовеста (Cloudflare Workers)",
-  "main": "worker.js",
-  "scripts": {
-    "dev": "wrangler dev",
-    "deploy": "wrangler deploy"
-  },
-  "devDependencies": {
-    "wrangler": "^3"
-  }
+  "description": "Облачная функция чата для Благовеста (Yandex Cloud Functions)",
+  "main": "index.js"
 }

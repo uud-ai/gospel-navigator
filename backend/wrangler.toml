@@ -1,9 +1,0 @@
-name = "blagovest-chat"
-main = "worker.js"
-compatibility_date = "2024-01-01"
-
-# Секреты (APP_TOKEN, PROXY_API_KEY) задаются отдельно через
-# `wrangler secret put` — не здесь, не попадают в git.
-[vars]
-CHAT_MODEL = "gpt-4o-mini"
-DATA_BASE_URL = "https://raw.githubusercontent.com/uud-ai/gospel-navigator/main/data"
