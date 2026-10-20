@@ -1,6 +1,6 @@
 # Благовест
 
-Telegram Mini App: ИИ-чат по Евангелию на русском языке. Одностраничное
+Веб-приложение: ИИ-чат по Евангелию на русском языке. Одностраничное
 приложение (`index.html`) с 14 темами (`topics.js`), «стихом дня»
 (`verses_of_day.js`, 40 стихов) и чатом, который отвечает на вопросы о
 Евангелии, опираясь на синодальный текст и толкования блж. Феофилакта
@@ -12,7 +12,9 @@ Telegram Mini App: ИИ-чат по Евангелию на русском яз�
 ## Как это устроено в продакшене
 
 ```
-Пользователь ──► https://vmestefamily.site  (GitHub Pages, этот репозиторий, ветка main)
+Пользователь ──► https://vmestefamily.site        лендинг (landing/)
+               └─► https://vmestefamily.site/app/   чат-приложение (корень репозитория)
+                   GitHub Pages, сборка GitHub Actions при push в main
                       │  POST /  (заголовки Origin + X-App-Token)
                       ▼
      Yandex Cloud Function  blagovest-chat
@@ -27,7 +29,7 @@ Telegram Mini App: ИИ-чат по Евангелию на русском яз�
 
 | Часть | Где | Как обновляется |
 |---|---|---|
-| Фронтенд (`index.html`, `sw.js`, `*.js`) | GitHub Pages, `main`, домен `vmestefamily.site` (файл `CNAME`) | `git push` в `main` |
+| Лендинг (`landing/`) и приложение (`index.html`, `sw.js`, `*.js`) | GitHub Pages, домен `vmestefamily.site`; workflow `.github/workflows/pages.yml` собирает лендинг на «/», приложение кладёт в «/app/» | `git push` в `main` |
 | Чат-функция (`backend/`) | Yandex Cloud Functions, `blagovest-chat` | `yc serverless function version create` (см. `backend/README.md`) |
 | Данные (`data/*`) | Копия в бакете `blagovest-data-uud` | `yc storage s3api put-object` (см. `backend/README.md`) — **после любой пересборки `data/` бакет нужно обновить вручную** |
 | DNS домена | рег.ру, свои NS (`ns1/ns2.reg.ru`) | 4 × A для `@` на IP GitHub Pages (`185.199.108–111.153`), CNAME `www` → `uud-ai.github.io` |
@@ -42,24 +44,24 @@ Telegram Mini App: ИИ-чат по Евангелию на русском яз�
 ## Запуск локально
 
 Сборка не требуется — обычный HTML/JS без фреймворков. `index.html` можно
-открыть напрямую или отдать любым статическим сервером. Telegram-слой
-(`telegram-web-app.js`) не обязателен: интерфейс и темы работают и вне
-Telegram.
+открыть напрямую или отдать любым статическим сервером. Интерфейс и темы работают без сети; нужен только чат.
 
 Чат при этом ходит в **боевую** функцию (`FUNCTION_URL` в `index.html`), а та
 пускает только разрешённые `Origin` (см. `ALLOWED_ORIGINS` в
 `backend/README.md`). С `file://` и `localhost` ответ будет 403. Для
 проверки самой функции используйте `backend/local-test.js`.
 
-## Telegram Mini App
+## Адрес приложения
 
-Адрес для `@BotFather` (`/newapp`) — `https://vmestefamily.site/`. Другие
+Приложение открывается на `https://vmestefamily.site/app/`, лендинг — на `https://vmestefamily.site/`. Другие
 адреса (например, `uud-ai.github.io`) функция отклонит с 403, пока их
 `Origin` не добавлен в `ALLOWED_ORIGINS`.
 
 ## Структура репозитория
 
 ```
+landing/           — лендинг (React + Vite + Motion); `npm run build` в этой папке
+                      собирает весь сайт в landing/dist (лендинг + /app/)
 index.html          — вся клиентская логика (UI, чат, работа с темами)
 sw.js               — Service Worker: офлайн-кэш оболочки приложения
 topics.js           — 14 тем, каждая со ссылками на стихи и вступлением

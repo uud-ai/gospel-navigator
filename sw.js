@@ -10,7 +10,7 @@
 //  - оболочка приложения (APP_SHELL) — ставится в кэш при install, поэтому
 //    темы и «стих дня» (это статика, зашитая в topics.js/verses_of_day.js)
 //    открываются офлайн сразу после первого визита;
-//  - внешние CDN (шрифты, иконки Tabler, marked, DOMPurify, Telegram SDK) —
+//  - внешние CDN (шрифты, иконки Tabler, marked, DOMPurify) —
 //    кэшируются по факту первого успешного запроса (runtime cache): заранее
 //    их не перечисляем, шрифтовых файлов десятки и у них версионированные
 //    имена на стороне CDN.
@@ -22,7 +22,7 @@
 //
 // При выпуске новой версии index.html/topics.js/verses_of_day.js —
 // поменяй CACHE_NAME, иначе старый кэш переживёт деплой.
-const CACHE_NAME = 'blagovest-v3';
+const CACHE_NAME = 'blagovest-v4';
 const APP_SHELL = ['./', './index.html', './topics.js', './verses_of_day.js'];
 
 self.addEventListener('install', (event) => {

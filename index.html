@@ -20,13 +20,8 @@
     <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.48.0/dist/tabler-icons.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <!-- DOMPurify — санитизация HTML после marked. Защищает от XSS, если LLM
-         (или будущий источник вроде commentaries) вернёт сырой HTML. Внутри
-         Telegram WebView это критично: там доступен tg.initData, по сути
-         токен аутентификации пользователя. -->
+         (или будущий источник вроде commentaries) вернёт сырой HTML. -->
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
-
-    <!-- Telegram Mini App SDK (для будущего перехода в Telegram). Безопасно работает и в обычном браузере. -->
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
     <style>
         :root {
@@ -58,8 +53,7 @@
             --spotlight: rgba(44,62,80,0.05);
         }
 
-        /* Тёмная тема — включается классом на <body>, который ставит JS,
-           когда Telegram сообщает colorScheme === 'dark'. Сохраняем церковную
+        /* Тёмная тема — включается классом theme-dark на <body> (сейчас JS его не ставит). Сохраняем церковную
            эстетику: тёмно-синий вместо чёрного, кремовый текст, тот же акцент. */
         body.theme-dark {
             --primary-color: #1a2530;      /* шапка ещё темнее */
@@ -534,9 +528,6 @@
         .ask-btn:hover, .ask-btn:focus-visible { filter: brightness(1.05); }
         .ask-btn:active { transform: scale(0.98); }
 
-        /* В Telegram Mini App вместо этой кнопки используем нативную MainButton */
-        body.in-telegram .ask-btn { display: none; }
-
         .ask-btn i {
             margin-right: 6px;
             vertical-align: -2px;
@@ -845,65 +836,18 @@
     // (см. деплой в backend/README.md).
     const APP_TOKEN = 'bg-public-v1-7Kp9qLm3X';
 
-    // ============================================================
-    // TELEGRAM MINI APP (если запущено внутри Telegram)
-    // ============================================================
-    const tg = window.Telegram?.WebApp;
-    const isInTelegram = tg && tg.initData && tg.initData.length > 0;
-
     // Если приложение открыли переходом с другой страницы того же сайта
-    // (напр. teaser-секция на главной nikolskiyhram.site, когда «Благовест»
-    // встроен туда подпапкой /blagovest/) — document.referrer это покажет.
-    // Домен нигде не хардкодим: сработает для любого сайта, который когда-
-    // нибудь ещё так же встроит приложение, и корректно ничего не покажет
-    // при прямом заходе (bookmark, Telegram, QR-код). Внутри Telegram не
-    // нужно — там выход из Mini App свой.
+    // (например, с лендинга), document.referrer это покажет, и стрелка «‹»
+    // на главном экране ведёт обратно туда. Домен нигде не хардкодим;
+    // при прямом заходе (закладка, QR-код) кнопка не показывается.
     let parentSiteUrl = null;
-    if (!isInTelegram && document.referrer) {
+    if (document.referrer) {
         try {
             const ref = new URL(document.referrer);
             if (ref.origin === location.origin && ref.href !== location.href) {
                 parentSiteUrl = ref.href;
             }
         } catch (e) { /* некорректный referrer — просто не показываем кнопку */ }
-    }
-
-    // Применяем тему (светлая/тёмная) на основе того, что говорит Telegram.
-    // Вне Telegram — всегда светлая (сохраняем исходный дизайн).
-    function applyTheme() {
-        if (!isInTelegram) return;
-        const isDark = tg.colorScheme === 'dark';
-        document.body.classList.toggle('theme-dark', isDark);
-        // Перекрашиваем шапку и фон самого Telegram в тон нашему приложению,
-        // чтобы не было видно «шва» между нативным UI и нашим контентом.
-        try {
-            tg.setHeaderColor(isDark ? '#1a2530' : '#2c3e50');
-            tg.setBackgroundColor(isDark ? '#243240' : '#f4f1ea');
-        } catch (e) {}
-        // theme-color мета-тега тоже обновим (для iOS статусбара)
-        const meta = document.querySelector('meta[name="theme-color"]');
-        if (meta) meta.setAttribute('content', isDark ? '#1a2530' : '#2c3e50');
-    }
-
-    if (tg) {
-        try {
-            tg.ready();
-            tg.expand();
-            // Отключаем закрытие приложения свайпом вниз — иначе при скролле
-            // в чате/теме Telegram случайно закрывает Mini App.
-            if (typeof tg.disableVerticalSwipes === 'function') {
-                tg.disableVerticalSwipes();
-            }
-            applyTheme();
-            // Реагируем на смену темы в Telegram «на лету».
-            tg.onEvent('themeChanged', applyTheme);
-        } catch (e) { /* в обычном браузере просто игнорируем */ }
-    }
-
-    if (isInTelegram) {
-        // Этот класс позволяет CSS скрыть нашу кнопку «Задать вопрос по этой теме»
-        // (вместо неё показываем нативную MainButton Telegram).
-        document.body.classList.add('in-telegram');
     }
 
     // ============================================================
@@ -917,30 +861,6 @@
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('sw.js').catch(() => {});
-        });
-    }
-
-    // --- Хелперы для тактильной отдачи (haptic feedback) ---
-    // Вне Telegram — пустые функции (no-op).
-    const haptic = {
-        light()    { try { tg?.HapticFeedback?.impactOccurred('light'); }    catch (e) {} },
-        medium()   { try { tg?.HapticFeedback?.impactOccurred('medium'); }   catch (e) {} },
-        soft()     { try { tg?.HapticFeedback?.impactOccurred('soft'); }     catch (e) {} },
-        success()  { try { tg?.HapticFeedback?.notificationOccurred('success'); } catch (e) {} },
-        error()    { try { tg?.HapticFeedback?.notificationOccurred('error'); }   catch (e) {} },
-        selection(){ try { tg?.HapticFeedback?.selectionChanged(); }         catch (e) {} }
-    };
-
-    // Замена window.confirm: внутри Telegram — нативный диалог, в браузере — обычный confirm.
-    function askConfirm(text) {
-        return new Promise(resolve => {
-            if (isInTelegram && typeof tg.showConfirm === 'function') {
-                try {
-                    tg.showConfirm(text, ok => resolve(!!ok));
-                    return;
-                } catch (e) { /* fallback ниже */ }
-            }
-            resolve(window.confirm(text));
         });
     }
 
@@ -1115,35 +1035,6 @@
             }, 50);
         }
 
-        // Для Telegram Mini App: показываем системную кнопку «Назад»
-        if (isInTelegram && tg.BackButton) {
-            try {
-                if (name === 'home') tg.BackButton.hide();
-                else tg.BackButton.show();
-            } catch (e) {}
-        }
-
-        // MainButton Telegram: показываем «Задать вопрос…» только на экране темы,
-        // на остальных экранах прячем.
-        if (isInTelegram && tg.MainButton) {
-            try {
-                if (name === 'topic' && currentTopic) {
-                    tg.MainButton.setText('Задать вопрос по теме');
-                    tg.MainButton.show();
-                } else {
-                    tg.MainButton.hide();
-                }
-            } catch (e) {}
-        }
-
-        // SettingsButton показываем только в чате — там она ведёт на «Очистить историю».
-        if (isInTelegram && tg.SettingsButton) {
-            try {
-                if (name === 'chat') tg.SettingsButton.show();
-                else tg.SettingsButton.hide();
-            } catch (e) {}
-        }
-
         window.scrollTo(0, 0);
     }
 
@@ -1182,7 +1073,6 @@
         `;
 
         document.getElementById('verseOfDayBtn').addEventListener('click', () => {
-            haptic.medium();
             openVerseOfDayChat();
         });
     }
@@ -1229,7 +1119,6 @@
     async function sendVerseOfDayQuestion(text) {
         if (isSending) return;
         isSending = true;
-        haptic.light();
         appendMessage('user', text);
         chatHistory.push({ role: "user", content: text });
         saveHistory();
@@ -1249,10 +1138,8 @@
             chatHistory.push({ role: "assistant", content: aiAnswer });
             if (chatHistory.length > 12) chatHistory = chatHistory.slice(-12);
             saveHistory();
-            haptic.success();
         } catch (error) {
             appendMessage('ai', 'К сожалению, произошла ошибка: ' + error.message);
-            haptic.error();
         } finally {
             isSending = false;
             setLoading(false);
@@ -1275,11 +1162,10 @@
                 <div class="tile-icon"><i class="ti ${topic.icon}"></i></div>
                 <div class="tile-title">${topic.title}</div>
             `;
-            tile.addEventListener('click', () => { haptic.selection(); openTopic(topic.id); });
+            tile.addEventListener('click', () => { openTopic(topic.id); });
             tile.addEventListener('keydown', e => {
                 if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    haptic.selection();
                     openTopic(topic.id);
                 }
             });
@@ -1402,7 +1288,7 @@
     }
 
     async function clearHistory() {
-        const yes = await askConfirm('Очистить историю переписки?');
+        const yes = window.confirm('Очистить историю переписки?');
         if (!yes) return;
         chatHistory = [];
         localStorage.removeItem('blagovest_chat_history');
@@ -1410,7 +1296,6 @@
         const cc = document.getElementById('chat-container');
         cc.innerHTML = '';
         appendMessage('ai', 'История очищена. О чём вы хотите спросить?', false);
-        haptic.success();
     }
 
     function openChat(topicContext) {
@@ -1461,7 +1346,6 @@
         if (!text) return; // пустую строку не шлём; валидация длины — на сервере
 
         isSending = true;
-        haptic.light();
         appendMessage('user', text);
         chatHistory.push({ role: "user", content: text });
         saveHistory();
@@ -1484,10 +1368,8 @@
 
             if (chatHistory.length > 12) chatHistory = chatHistory.slice(-12);
             saveHistory();
-            haptic.success();
         } catch (error) {
             appendMessage('ai', 'К сожалению, произошла ошибка: ' + error.message);
-            haptic.error();
         } finally {
             isSending = false;
             setLoading(false);
@@ -1528,24 +1410,22 @@
     // СЛУШАТЕЛИ СОБЫТИЙ
     // ============================================================
     document.getElementById('backBtn').addEventListener('click', () => {
-        haptic.light();
         if (currentScreen === 'home' && parentSiteUrl) {
             location.href = parentSiteUrl;
             return;
         }
         goBack();
     });
-    document.getElementById('clearBtn').addEventListener('click', () => { haptic.light(); clearHistory(); });
-    document.getElementById('freeChatCard').addEventListener('click', () => { haptic.selection(); openChat(null); });
+    document.getElementById('clearBtn').addEventListener('click', () => { clearHistory(); });
+    document.getElementById('freeChatCard').addEventListener('click', () => { openChat(null); });
     document.getElementById('freeChatCard').addEventListener('keydown', e => {
         if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
-            haptic.selection();
             openChat(null);
         }
     });
-    document.getElementById('askAboutTopicBtn').addEventListener('click', () => { haptic.medium(); openChat(currentTopic); });
-    document.getElementById('sendBtn').addEventListener('click', sendMessage); // haptic уже внутри sendMessage
+    document.getElementById('askAboutTopicBtn').addEventListener('click', () => { openChat(currentTopic); });
+    document.getElementById('sendBtn').addEventListener('click', sendMessage);
     document.getElementById('userInput').addEventListener('keydown', e => {
         // keydown надёжнее устаревшего keypress; isComposing — чтобы Enter
         // во время ввода через IME (китайский/японский и т.п.) не отправлял сообщение.
@@ -1554,53 +1434,6 @@
             sendMessage();
         }
     });
-
-    // Делегат на клики по ссылкам внутри сообщений чата.
-    // В Mini App обычный target="_blank" работает нестабильно (особенно на iOS —
-    // webview блокирует popup без user gesture в нужном фрейме). Правильный путь —
-    // tg.openLink для внешних http(s) и tg.openTelegramLink для t.me/...
-    // Делегат покрывает и наши azbyka-ссылки из linkifyBible, и любые ссылки,
-    // которые LLM мог вернуть в markdown-ответе (после marked → DOMPurify).
-    // Вне Telegram (отладка в обычном браузере) — fallback на дефолтное поведение.
-    document.getElementById('chat-container').addEventListener('click', e => {
-        const a = e.target.closest('a');
-        if (!a) return;
-        const url = a.href;
-        if (!url || !/^https?:\/\//i.test(url)) return; // mailto:, tg://, прочее — оставляем браузеру
-        if (!isInTelegram || !tg.openLink) return; // fallback на target="_blank"
-        e.preventDefault();
-        if (/^https?:\/\/t\.me\//i.test(url)) {
-            try { tg.openTelegramLink(url); } catch (err) { window.open(url, '_blank'); }
-        } else {
-            try { tg.openLink(url); } catch (err) { window.open(url, '_blank'); }
-        }
-    });
-
-    // ============================================================
-    // ИНТЕГРАЦИЯ С НАТИВНЫМИ КНОПКАМИ TELEGRAM
-    // Регистрируем обработчики один раз — иначе одно нажатие сработает многократно.
-    // ============================================================
-    if (isInTelegram) {
-        // BackButton — системная стрелка «Назад» в шапке Telegram
-        if (tg.BackButton) {
-            try { tg.BackButton.onClick(() => { haptic.light(); goBack(); }); } catch (e) {}
-        }
-        // MainButton — нижняя цветная кнопка Telegram, используем на экране темы
-        if (tg.MainButton) {
-            try {
-                tg.MainButton.onClick(() => {
-                    if (currentScreen === 'topic' && currentTopic) {
-                        haptic.medium();
-                        openChat(currentTopic);
-                    }
-                });
-            } catch (e) {}
-        }
-        // SettingsButton — троеточие в углу, ведёт на «Очистить историю»
-        if (tg.SettingsButton) {
-            try { tg.SettingsButton.onClick(() => { haptic.light(); clearHistory(); }); } catch (e) {}
-        }
-    }
 
     // ============================================================
     // ДЕСКТОПНЫЙ "СПОТЛАЙТ" ЗА ПРИЛОЖЕНИЕМ

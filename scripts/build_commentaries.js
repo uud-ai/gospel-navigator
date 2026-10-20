@@ -21,7 +21,7 @@ const fs = require('fs');
 const path = require('path');
 
 const DELAY_MS = 1500;
-const USER_AGENT = 'BlagovestBot/1.0 (non-commercial Telegram Mini App; one-time scrape; +https://github.com/uud-ai/gospel-navigator)';
+const USER_AGENT = 'BlagovestBot/1.0 (non-commercial; one-time scrape; +https://github.com/uud-ai/gospel-navigator)';
 
 // Книги Четвероевангелия. slug — кусок URL на azbyka, chapters — сколько глав
 // в книге, bookName — то, как книга названа в bible.json (важно: ровно эта
