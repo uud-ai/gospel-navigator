@@ -22,21 +22,32 @@
  *   PROXY_API_KEY    — секрет, ключ proxyapi.ru (OpenAI-совместимый прокси).
  *   CHAT_MODEL       — переменная, модель чата, по умолчанию 'gpt-4o-mini'.
  *   DATA_BASE_URL    — переменная, https-префикс, откуда читаются
- *                       data/bible.json, data/commentaries.json и
- *                       *_embeddings.json. По умолчанию — raw.githubusercontent.com
- *                       на этот же репозиторий (данные публичны).
+ *                       bible.json, commentaries.json, bible_embeddings.bin и
+ *                       commentaries_embeddings.bin. В проде — публичный бакет
+ *                       Object Storage (https://storage.yandexcloud.net/
+ *                       blagovest-data-uud): с raw.githubusercontent.com 24 МБ
+ *                       эмбеддингов не успевают скачаться за таймаут функции.
+ *                       По умолчанию — raw.githubusercontent.com на этот же
+ *                       репозиторий (годится для локальных тестов).
  *   ALLOWED_ORIGINS  — переменная, список разрешённых Origin через запятую.
- *                       По умолчанию 'https://nikolskiyhram.site'.
+ *                       По умолчанию 'https://nikolskiyhram.site'; в проде ещё
+ *                       'https://vmestefamily.site'.
  *
  * Параметры эмбеддингов (EMBEDDING_MODEL/EMBEDDING_DIMS) зафиксированы и
- * совпадают с scripts/build_commentaries_embeddings.js — менять нельзя,
- * иначе старые *_embeddings.json станут несовместимы с новыми запросами.
+ * совпадают с scripts/build_*_embeddings.js — менять нельзя, иначе
+ * существующие *_embeddings.bin станут несовместимы с новыми запросами.
  */
 
 const PROXY_BASE_URL = 'https://api.proxyapi.ru/openai/v1';
 const EMBEDDING_MODEL = 'text-embedding-3-small';
 const EMBEDDING_DIMS = 512;
 const CHAT_MAX_TOKENS = 700;
+
+// Платформенный таймаут функции — 30 с. Свои таймауты короче, чтобы при
+// зависании внешнего сервиса клиент получил наш 500 с понятным сообщением,
+// а не платформенный 504 без поля message.
+const API_TIMEOUT_MS = 20000;
+const DATA_TIMEOUT_MS = 25000;
 
 const MAX_MESSAGES = 12;
 const MAX_MESSAGE_LENGTH = 2000;
@@ -229,6 +240,7 @@ async function embedText(text) {
             Authorization: `Bearer ${process.env.PROXY_API_KEY}`,
         },
         body: JSON.stringify({ model: EMBEDDING_MODEL, input: [text], dimensions: EMBEDDING_DIMS }),
+        signal: AbortSignal.timeout(API_TIMEOUT_MS),
     });
     if (!res.ok) {
         const bodyText = await res.text();
@@ -252,6 +264,7 @@ async function callChatModel(messages) {
             max_tokens: CHAT_MAX_TOKENS,
             temperature: 0.4,
         }),
+        signal: AbortSignal.timeout(API_TIMEOUT_MS),
     });
     if (!res.ok) throw new Error(`chat API ${res.status}: ${(await res.text()).slice(0, 200)}`);
     const data = await res.json();
@@ -267,7 +280,7 @@ let dataCachePromise = null;
 const DEFAULT_DATA_BASE_URL = 'https://raw.githubusercontent.com/uud-ai/gospel-navigator/main/data';
 
 async function fetchJson(baseUrl, filename) {
-    const res = await fetch(`${baseUrl}/${filename}`);
+    const res = await fetch(`${baseUrl}/${filename}`, { signal: AbortSignal.timeout(DATA_TIMEOUT_MS) });
     if (!res.ok) throw new Error(`не удалось загрузить ${filename}: ${res.status}`);
     return res.json();
 }
@@ -280,7 +293,7 @@ async function fetchJson(baseUrl, filename) {
 // scripts/build_commentaries_embeddings.js — менять расширение/порядок байт
 // в одном месте без другого нельзя.
 async function fetchFloat32(baseUrl, filename) {
-    const res = await fetch(`${baseUrl}/${filename}`);
+    const res = await fetch(`${baseUrl}/${filename}`, { signal: AbortSignal.timeout(DATA_TIMEOUT_MS) });
     if (!res.ok) throw new Error(`не удалось загрузить ${filename}: ${res.status}`);
     return new Float32Array(await res.arrayBuffer());
 }
