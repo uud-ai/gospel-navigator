@@ -29,8 +29,8 @@ Functions** (перенесена с Cloudflare Workers: с 2026 российс�
 | `APP_TOKEN` | секрет | да | должен совпадать с `APP_TOKEN` в `index.html` |
 | `PROXY_API_KEY` | секрет | да | ключ proxyapi.ru |
 | `CHAT_MODEL` | переменная | нет | по умолчанию `gpt-4o-mini` |
-| `DATA_BASE_URL` | переменная | нет | по умолчанию `raw.githubusercontent.com` на этот репозиторий |
-| `ALLOWED_ORIGINS` | переменная | нет | разрешённые `Origin` через запятую, по умолчанию `https://nikolskiyhram.site` |
+| `DATA_BASE_URL` | переменная | нет | по умолчанию `raw.githubusercontent.com` на этот репозиторий; **в проде — бакет Object Storage** `https://storage.yandexcloud.net/blagovest-data-uud` (GitHub raw отдаёт 24 МБ эмбеддингов 15–30 с и не укладывается в таймаут 30 с на холодном старте) |
+| `ALLOWED_ORIGINS` | переменная | нет | разрешённые `Origin` через запятую, по умолчанию `https://nikolskiyhram.site`; в проде ещё `https://vmestefamily.site` |
 
 ## Деплой (Yandex Cloud, `yc` CLI)
 
@@ -43,18 +43,26 @@ Functions** (перенесена с Cloudflare Workers: с 2026 российс�
 yc serverless function create --name blagovest-chat
 ```
 
+Данные в бакет (один раз и после каждой пересборки `data/`):
+```bash
+yc storage bucket create --name blagovest-data-uud --public-read
+cd data && for f in bible.json commentaries.json bible_embeddings.bin commentaries_embeddings.bin; do
+  yc storage s3api put-object --bucket blagovest-data-uud --key $f --body $f
+done
+```
+
 Задеплоить код (каждый раз после изменений в `index.js`) — из папки `backend/`:
 ```bash
 yc serverless function version create \
   --function-name blagovest-chat \
   --runtime nodejs18 \
   --entrypoint index.handler \
-  --memory 256m \
+  --memory 512m \
   --execution-timeout 30s \
   --source-path . \
   --environment CHAT_MODEL=gpt-4o-mini \
-  --environment DATA_BASE_URL=https://raw.githubusercontent.com/uud-ai/gospel-navigator/main/data \
-  --environment ALLOWED_ORIGINS=https://nikolskiyhram.site \
+  --environment DATA_BASE_URL=https://storage.yandexcloud.net/blagovest-data-uud \
+  --environment ALLOWED_ORIGINS=https://nikolskiyhram.site,https://vmestefamily.site \
   --secret environment-variable=APP_TOKEN,id=<lockbox-secret-id>,version-id=<version-id>,key=APP_TOKEN \
   --secret environment-variable=PROXY_API_KEY,id=<lockbox-secret-id>,version-id=<version-id>,key=PROXY_API_KEY
 ```

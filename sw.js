@@ -16,13 +16,13 @@
 //    имена на стороне CDN.
 //
 // Чего не кэшируется:
-//  - POST-запросы к чат-бэкенду (Cloudflare Workers) — это живой API,
+//  - POST-запросы к чат-бэкенду (Yandex Cloud Functions) — это живой API,
 //    не статика. Офлайн чат закономерно не отвечает — index.html уже
 //    показывает понятную ошибку сети (см. postChatRequest).
 //
 // При выпуске новой версии index.html/topics.js/verses_of_day.js —
 // поменяй CACHE_NAME, иначе старый кэш переживёт деплой.
-const CACHE_NAME = 'blagovest-v2';
+const CACHE_NAME = 'blagovest-v3';
 const APP_SHELL = ['./', './index.html', './topics.js', './verses_of_day.js'];
 
 self.addEventListener('install', (event) => {
