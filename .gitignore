@@ -4,3 +4,5 @@ temp_bible/
 .env
 .DS_Store
 __pycache__/
+.wrangler/
+.dev.vars
