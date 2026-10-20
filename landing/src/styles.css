@@ -34,7 +34,9 @@ p { margin: 0; }
 a { color: inherit; }
 ul, ol { margin: 0; padding: 0; list-style: none; }
 
-:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; border-radius: 4px; }
+:focus-visible { outline: 3px solid var(--crimson); outline-offset: 3px; border-radius: 4px; }
+/* на тёмных блоках золотой контур, на светлых — малиновый: оба ≥3:1 к фону */
+.header :focus-visible, .hero :focus-visible, .verse :focus-visible, .footer :focus-visible, .facts :focus-visible { outline-color: var(--gold); }
 
 .skip {
   position: absolute; left: 16px; top: -60px; z-index: 100;
@@ -144,13 +146,13 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .topic:hover { transform: translateY(-4px); box-shadow: 0 16px 34px rgba(31, 46, 61, .12); border-color: var(--crimson); }
 .topic h3 { font-size: 25px; margin: 0; }
 .topic p { font-size: 15px; color: var(--muted); line-height: 1.5; }
-.topic-ref { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--crimson); }
+.topic-ref { font-size: 13px; letter-spacing: .06em; color: var(--crimson); }
 
 /* ---------- Стих ---------- */
-.verse { background: var(--navy); color: var(--parchment); padding: clamp(72px, 11vw, 140px) var(--gutter); text-align: center; }
-.verse blockquote { margin: 0 auto; max-width: 18em; }
+.verse { background: var(--navy); color: var(--parchment); padding: clamp(56px, 8vw, 96px) var(--gutter); text-align: center; }
+.verse blockquote { margin: 0 auto; max-width: 960px; }
 .verse blockquote p { font-family: var(--serif); font-style: italic; font-weight: 500; font-size: clamp(30px, 5vw, 56px); line-height: 1.2; text-wrap: balance; }
-.verse footer { margin-top: 22px; color: var(--gold); letter-spacing: .14em; font-size: 14px; text-transform: uppercase; }
+.verse footer { margin-top: 22px; color: var(--gold); letter-spacing: .1em; font-size: 15px; }
 .verse-note { margin: 40px auto 0; max-width: 30em; opacity: .7; font-size: 15px; }
 
 /* ---------- Источники ---------- */

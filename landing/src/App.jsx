@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { motion, useReducedMotion } from 'motion/react';
+import { motion, MotionConfig, useReducedMotion } from 'motion/react';
 import { TOPICS } from './topics.js';
 
 const APP_URL = '/app/';
@@ -277,7 +277,7 @@ function Footer() {
 
 export default function App() {
   return (
-    <>
+    <MotionConfig reducedMotion="user">
       <a className="skip" href="#how">К содержимому</a>
       <Header />
       <main>
@@ -290,6 +290,6 @@ export default function App() {
         <Cta />
       </main>
       <Footer />
-    </>
+    </MotionConfig>
   );
 }
