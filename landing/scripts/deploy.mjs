@@ -29,8 +29,6 @@ function* walk(dir) {
 
 for (const file of walk(dist)) {
   const key = relative(dist, file).split('\\').join('/');
-  // CNAME нужен был GitHub Pages; в бакете он не используется.
-  if (key === 'CNAME') continue;
   execFileSync('yc', [
     'storage', 's3api', 'put-object',
     '--bucket', BUCKET,

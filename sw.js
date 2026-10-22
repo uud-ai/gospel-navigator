@@ -3,8 +3,7 @@
 // Файл должен лежать В ТОЙ ЖЕ папке, что index.html — scope service worker'а
 // браузер берёт из места самого файла (см. регистрацию в index.html:
 // navigator.serviceWorker.register('sw.js'), путь относительный специально,
-// чтобы работало и в корне (GitHub Pages gospel-navigator), и в подкаталоге
-// (nikolskiyhram.site/blagovest/) без хардкода.
+// чтобы работало и в корне, и в подкаталоге (/app/) без хардкода.
 //
 // Что кэшируется:
 //  - оболочка приложения (APP_SHELL) — ставится в кэш при install, поэтому
@@ -22,7 +21,7 @@
 //
 // При выпуске новой версии index.html/topics.js/verses_of_day.js —
 // поменяй CACHE_NAME, иначе старый кэш переживёт деплой.
-const CACHE_NAME = 'blagovest-v4';
+const CACHE_NAME = 'blagovest-v5';
 const APP_SHELL = ['./', './index.html', './topics.js', './verses_of_day.js'];
 
 self.addEventListener('install', (event) => {
