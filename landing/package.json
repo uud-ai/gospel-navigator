@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "vite build && node scripts/assemble.mjs",
     "preview": "vite preview",
+    "deploy": "npm run build && node scripts/deploy.mjs",
     "lint": "eslint src"
   },
   "dependencies": {

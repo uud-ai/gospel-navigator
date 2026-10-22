@@ -14,7 +14,7 @@
 ```
 Пользователь ──► https://vmestefamily.site        лендинг (landing/)
                └─► https://vmestefamily.site/app/   чат-приложение (корень репозитория)
-                   GitHub Pages, сборка GitHub Actions при push в main
+                   Yandex Object Storage, бакет vmestefamily.site (HTTPS: сертификат Certificate Manager)
                       │  POST /  (заголовки Origin + X-App-Token)
                       ▼
      Yandex Cloud Function  blagovest-chat
@@ -29,10 +29,10 @@
 
 | Часть | Где | Как обновляется |
 |---|---|---|
-| Лендинг (`landing/`) и приложение (`index.html`, `sw.js`, `*.js`) | GitHub Pages, домен `vmestefamily.site`; workflow `.github/workflows/pages.yml` собирает лендинг на «/», приложение кладёт в «/app/» | `git push` в `main` |
+| Лендинг (`landing/`) и приложение (`index.html`, `sw.js`, `*.js`) | Yandex Object Storage, бакет `vmestefamily.site`: лендинг на «/», приложение в «/app/» | `cd landing && npm run deploy` (сборка + загрузка через `yc`) |
 | Чат-функция (`backend/`) | Yandex Cloud Functions, `blagovest-chat` | `yc serverless function version create` (см. `backend/README.md`) |
 | Данные (`data/*`) | Копия в бакете `blagovest-data-uud` | `yc storage s3api put-object` (см. `backend/README.md`) — **после любой пересборки `data/` бакет нужно обновить вручную** |
-| DNS домена | рег.ру, свои NS (`ns1/ns2.reg.ru`) | 4 × A для `@` на IP GitHub Pages (`185.199.108–111.153`), CNAME `www` → `uud-ai.github.io` |
+| DNS домена | рег.ру, свои NS (`ns1/ns2.reg.ru`) | A `@` → `213.180.193.247` (адрес хостинга сайтов Object Storage), CNAME `www` → бакет `www.vmestefamily.site` (редирект на основной адрес), CNAME `_acme-challenge` и `_acme-challenge.www` для автопродления сертификатов |
 
 Почему данные в Object Storage, а не на `raw.githubusercontent.com`: 24 МБ
 эмбеддингов оттуда скачиваются 15–30 с и не укладываются в 30-секундный
@@ -66,7 +66,6 @@ index.html          — вся клиентская логика (UI, чат, р
 sw.js               — Service Worker: офлайн-кэш оболочки приложения
 topics.js           — 14 тем, каждая со ссылками на стихи и вступлением
 verses_of_day.js    — 40 стихов «на каждый день», ротация по дате
-CNAME               — пользовательский домен для GitHub Pages
 data/
   bible.json                  — весь Новый Завет (27 книг), синодальный
                                  перевод, 7955 стихов
